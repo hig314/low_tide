@@ -74,9 +74,16 @@ SSH: `ssh root@164.92.75.176` (local `~/.ssh/id_rsa`, key "macbook" on the accou
   - `Caddyfile` — reference copy of the updated `/opt/caddy/Caddyfile`.
   - `opt-README.md` — reference copy of the droplet's updated `/opt/README.md`.
   - `app/` — verbatim copy of the low_tide project (the `website/` contents).
+  - `refresh/` — the **data-refresh cron** (our infra): `refresh.sh` + `README.md`.
+    Deployed to `/opt/lowtide/refresh/`. See "Data refresh (cron)" below.
 - `extracted/` — unzipped originals. `website/website/` = low_tide source;
   `data_analysis/.../low_tide_app/` = the full HWITW repo (helm/docker/data tools).
 - `website.zip`, `Low_tide_data_analasys_web.zip` — the original archives.
+
+This folder is a **git repo** (`main`), pushed to a private GitHub repo
+`github.com/hig314/low_tide`. Archives (`*.zip`) and `extracted/` are gitignored;
+the deployed source of truth lives in `deploy/app/`. Each collaborator zip handoff
+is applied into `deploy/app/` and committed, so her versions diff cleanly.
 
 ## Common ops
 
@@ -84,27 +91,52 @@ SSH: `ssh root@164.92.75.176` (local `~/.ssh/id_rsa`, key "macbook" on the accou
     ssh root@164.92.75.176 'docker ps'
     ssh root@164.92.75.176 'docker logs lowtide --tail 50'
 
-    # redeploy after changing app content or the framework (from deploy/)
+    # redeploy after changing app content or the framework (from deploy/).
+    # NOTE: the four data-blob excludes are deliberate — the cron owns live data;
+    # a code handoff must not clobber freshly-fetched blobs (rsync also won't
+    # --delete excluded files on the remote). See "Data refresh (cron)" below.
     rsync -az --delete --exclude '.DS_Store' --exclude '__pycache__' --exclude '._*' \
+      --exclude 'static/seldovia_sheet.js' --exclude 'static/costal_studies_sheet.js' \
+      --exclude 'static/Temp_data.js' --exclude 'static/temp_data.js' \
       docker-compose.yml nginx.conf app  root@164.92.75.176:/opt/lowtide/
     ssh root@164.92.75.176 '
       cp -f /opt/lowtide/app/static/Temp_data.js /opt/lowtide/app/static/temp_data.js
       chmod -R a+rX /opt/lowtide/app
       cd /opt/lowtide && docker compose up -d'
 
-    # refresh the data blobs: run the project's download.py locally to regenerate
-    # static/seldovia_sheet.js + static/costal_studies_sheet.js + static/Temp_data.js,
-    # then redeploy as above.
+    # data blobs refresh AUTOMATICALLY via cron (see below) — no manual step needed.
+    # To force a refresh now:
+    ssh root@164.92.75.176 'REFRESH_BACKOFF=5 /opt/lowtide/refresh/refresh.sh; tail -5 /opt/lowtide/refresh/refresh.log'
 
     # verify live after deploy (Caddy routes lowtide on Host: 209.38.5.101; assets at /)
     curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: 209.38.5.101' \
       http://164.92.75.176/seldovia_sheet.js
 
+## Data refresh (cron)
+
+Live data blobs refresh **daily at 04:00 America/Anchorage** on the droplet via
+`/opt/lowtide/refresh/refresh.sh` (source: `deploy/refresh/`, full notes in
+`deploy/refresh/README.md`). Cron uses `CRON_TZ=America/Anchorage` so 4 AM holds
+across DST.
+
+- **Runs her `download.py` UNMODIFIED** in a staging dir `/opt/lowtide/refresh/work/`
+  (our own venv with `requests`), then publishes the 3 regenerated blobs into the
+  live `app/static/` and recreates the lowercase `temp_data.js` alias.
+- **Sources (public, no auth):** 2 Google Sheets (Seldovia + Costal studies) and
+  NOAA station 9455500 water temperature. The NOAA temp fetch is **incremental**
+  and stateful — the `Temp_data` pickle lives in `work/` and must persist; never
+  delete it (else it refetches from 2004).
+- **Isolation = cron owns data, handoffs own code.** The deploy rsync excludes the
+  4 generated blobs (see Common ops) so the two never collide. We touch none of her
+  files; all cron infra lives in `deploy/refresh/` ↔ `/opt/lowtide/refresh/`.
+- **Failure = log-only.** NOAA's `water_temperature` product 5xx's intermittently
+  and her code raises on it (temp runs first, so a blip aborts the whole run);
+  `refresh.sh` retries, and on failure keeps last-good live data + logs. Skipped
+  days self-heal on the next success (incremental backfill).
+- Check it: `ssh root@164.92.75.176 'crontab -l; tail -20 /opt/lowtide/refresh/refresh.log'`
+
 ## Possible follow-ups (not done, not blocking)
 
-- **Git repo:** there is none. Each collaborator handoff is a separate zip, compared
-  by hand. A `git init` here would let us diff her versions cleanly. Proposed, not
-  yet done.
 - HTTPS: not possible on a bare IP (Let's Encrypt won't issue for IPs). If a domain
   is pointed at 209.38.5.101, add a domain block to the Caddyfile and Caddy
   auto-issues TLS. A commented example is in `deploy/Caddyfile`.
