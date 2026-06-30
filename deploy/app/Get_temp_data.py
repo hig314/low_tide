@@ -105,6 +105,7 @@ def update_data(end_date):
             update_data(save_end)
         
     else:
-        raise Exception(f"Failed to fetch data. Status code: {response.status_code}")
+        print(f"Failed to fetch data. Status code: {response.status_code}")
+        return
 
 
