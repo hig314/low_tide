@@ -58,4 +58,8 @@ function arrayIndex(matrix,target){
 function arrayIncludes(matrix,target){
 	return matrix.some(innerArray => innerArray.length === target.length && innerArray.every((value, index) => value === target[index]));
 }
+function clearListeners(element){
+	const new_elem = element.cloneNode(true);
+	element.parentNode.replaceChild(new_elem, element);
+}
 console.log(isNum('+63.1'))

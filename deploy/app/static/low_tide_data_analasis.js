@@ -110,7 +110,7 @@ function flatten(items, seqtypes=[list, tuple]) {
         for( let species of Object.keys(selected[0]) ) {
             this.selected[this.file][species] = [+selected[0][species].checked,selected[1][species].value,selected[2][species].value,selected[3][species]];
         }
-        document.getElementById('custom_speiceis').innerHTML = ''
+		this.speicies.clear()
         this.speicies = new SpeiciesFrame(this,file,this.selected[file],this.master);
         this.file = file;
     }
@@ -124,8 +124,7 @@ function flatten(items, seqtypes=[list, tuple]) {
         generate_custom_file(this.selected,document.getElementById('name').value);
 		document.getElementById('custom').classList.add('hidden');
 		document.getElementById('page-overlay').classList.add('hidden');
-		document.getElementById('custom_speiceis').innerHTML = ''
-		document.getElementById('group_name_enter').value = ''
+		this.speicies.clear()
 		this.speicies = null
 		document.getElementById('name').value = ''
 		this.master.select_custom()
@@ -181,7 +180,7 @@ class SpeiciesFrame {
 		this.new_group_button.addEventListener("click", () => this.make_popup());
 		
         this.group_submit_button = document.getElementById('group_submit');
-		this.group_submit_button.addEventListener("click", () => this.add_group(),{ once: true });
+		this.group_submit_button.addEventListener("click", () => this.add_group());
     }
 
     set_speicies(set_type) {
@@ -192,9 +191,10 @@ class SpeiciesFrame {
     make_popup() {
 		document.getElementById('group_name').classList.remove('hidden');
 		document.getElementById('page-overlay2').classList.remove('hidden');
+        
     }
 
-    add_group(name_input) {
+    add_group() {
 		document.getElementById('group_name').classList.add('hidden');
 		document.getElementById('page-overlay2').classList.add('hidden');
         let name = document.getElementById('group_name_enter').value;
@@ -213,6 +213,7 @@ class SpeiciesFrame {
         this.group_inputs[name] = group;
         this.types[name] = 'group'
 		this.ind ++
+		document.getElementById('group_name_enter').value = ''
         // Label(self, {text: name }).grid( {row: this.ind,column: 0 });
 //         this.checkbuttons.push(Checkbutton(self, {text: '',variable: var }));
 //         this.checkbuttons.at(-1).grid( {row: this.ind,column: 1 });
@@ -238,10 +239,19 @@ class SpeiciesFrame {
         return [this.checkboxes,this.color_inputs,this.group_inputs,this.types];
     }
 
-    update_prevew(name) {
+    update_prevew(name){
 		console.log(this.color_inputs[name].value)
         this.color_buttons[name].style.color = this.color_inputs[name].value;
     }
+	
+	clear(){
+		console.log('clear')
+		document.getElementById('custom_speiceis').innerHTML = ''
+		clearListeners(this.group_submit_button)
+		clearListeners(this.new_group_button)
+		clearListeners(this.all_speicies_button)
+		clearListeners(this.no_speicies_button)
+	}
 }
 class CrabVisualizationFrame {
 	
