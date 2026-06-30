@@ -1,0 +1,32 @@
+# /opt/caddy/Caddyfile
+#
+# Naked-IP HTTP surface. Two apps share this droplet's single :80 listener,
+# split by the request Host header (i.e. the IP address you typed):
+#
+#   209.38.5.101   (reserved IP)  -> low_tide static app   (lowtide:80)
+#   164.92.75.176  (droplet IP)   -> HWITW                 (hwitw:5000)
+#   <anything else>               -> HWITW (default)
+#
+# DigitalOcean routes the reserved IP onto eth0 via 1:1 NAT, but the browser
+# still sends `Host: 209.38.5.101`, so we route purely on Host -- no per-
+# interface binding needed, and the Caddy container keeps its single :80 map.
+#
+# To add a real domain later, give it its own block, e.g.:
+#   lowtide.example.org { encode gzip; reverse_proxy lowtide:80 }
+# Caddy auto-issues a Let's Encrypt cert on first request.
+:80 {
+    encode gzip
+
+    # --- low_tide: reached via the reserved IP 209.38.5.101 ---
+    @lowtide host 209.38.5.101
+    handle @lowtide {
+        reverse_proxy lowtide:80
+    }
+
+    # --- HWITW: the droplet's primary IP (and any other Host) ---
+    handle {
+        @root path /
+        redir @root /static/hwitw-cesium.html
+        reverse_proxy hwitw:5000
+    }
+}

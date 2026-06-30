@@ -1,0 +1,18 @@
+# OS cruft
+.DS_Store
+._*
+
+# Python
+__pycache__/
+*.pyc
+
+# Local Claude Code settings (machine-specific permissions)
+.claude/settings.local.json
+
+# Collaborator handoff archives + their unzipped originals.
+# Bulky and regenerable; the deployed source lives in deploy/app/.
+*.zip
+extracted/
+
+# Runtime logs
+server.log

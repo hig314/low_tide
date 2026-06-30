@@ -1,0 +1,20 @@
+services:
+  lowtide:
+    image: nginx:alpine
+    container_name: lowtide
+    restart: unless-stopped
+    volumes:
+      # The low_tide project, copied VERBATIM (no source edits). Docroot is its
+      # static/ folder so "/" serves index_lt.html and its relative assets resolve.
+      - ./app/static:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    expose:
+      - "80"
+    networks:
+      - web_external
+
+# Shared reverse-proxy network owned by /opt/caddy. Caddy routes traffic whose
+# Host is the reserved IP to this container by name (lowtide:80).
+networks:
+  web_external:
+    external: true
