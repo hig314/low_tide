@@ -1,6 +1,6 @@
 # low_tide — project state
 
-Snapshot for resuming after a break. Last worked: 2026-06-29.
+Snapshot for resuming after a break. Last worked: 2026-06-30.
 
 ## What this is
 
@@ -11,12 +11,22 @@ alongside **HWITW** (How Weird is the Weather) on a shared DigitalOcean droplet.
 This folder holds the source (zipped + extracted) and the **deployment framework**
 I built. The app source itself is deployed **verbatim — no source edits**.
 
-**Handoffs:** the collaborator ships new versions as zip files (no shared git repo —
-see follow-ups). Each new zip is unzipped, mirrored into `deploy/app/` with rsync
-`--delete`, smoke-tested locally, then deployed. Handoff history:
+**Handoffs:** the collaborator ships new versions as zip files. A zip may be a
+**full** tree (mirror into `deploy/app/` with rsync `--delete`) or a **partial**
+set of just-changed files (copy those files in — do NOT `--delete`, that would wipe
+the tree). Workflow each time: unzip → diff against `deploy/app/` → apply → smoke-test
+locally → deploy → verify live → `git add -A && commit && push` (one commit per
+handoff, so her versions diff cleanly). Handoff history:
 - `website.zip` — initial deploy (2026-06-08).
-- `website 2.zip` — 2026-06-29: split the data into **two datasets** (Seldovia +
-  Coastal studies) with an area selector; bigger temp data. Deployed & verified.
+- `website 2.zip` — 2026-06-29 (full): split the data into **two datasets** (Seldovia +
+  Coastal studies) with an area selector; bigger temp data.
+- `website 3.zip` — 2026-06-29 (partial, 2 files): `libs/utils.js` gains a
+  `clearListeners()` helper; `low_tide_data_analasis.js` uses it + a new `clear()`
+  method to tear down the custom-species UI (drops the old `{once:true}` listener).
+- `website 4.zip` — 2026-06-30 (partial, 1 file): `Get_temp_data.py` — on a NOAA
+  non-200, `print`+`return` instead of `raise`, so a NOAA outage no longer aborts
+  the whole refresh (Google Sheets still update; temp stays last-good). Directly
+  addresses the NOAA fragility noted in "Data refresh (cron)".
 
 ## Current status: DEPLOYED & LIVE ✅
 
@@ -129,10 +139,13 @@ across DST.
 - **Isolation = cron owns data, handoffs own code.** The deploy rsync excludes the
   4 generated blobs (see Common ops) so the two never collide. We touch none of her
   files; all cron infra lives in `deploy/refresh/` ↔ `/opt/lowtide/refresh/`.
-- **Failure = log-only.** NOAA's `water_temperature` product 5xx's intermittently
-  and her code raises on it (temp runs first, so a blip aborts the whole run);
-  `refresh.sh` retries, and on failure keeps last-good live data + logs. Skipped
-  days self-heal on the next success (incremental backfill).
+- **Failure = log-only, and NOAA outages now degrade gracefully.** NOAA's
+  `water_temperature` product 5xx's intermittently. Since the `website 4.zip`
+  handoff, `Get_temp_data.py` skips (print+return) instead of raising, so a NOAA
+  blip no longer aborts the run — the Google Sheets still refresh and temp holds at
+  last-good (the early return is before the pickle write, so no corruption). Skipped
+  days self-heal on the next success (incremental backfill). `refresh.sh` still adds
+  belt-and-suspenders: retries, keeps last-good on any hard failure, and logs.
 - Check it: `ssh root@164.92.75.176 'crontab -l; tail -20 /opt/lowtide/refresh/refresh.log'`
 
 ## Possible follow-ups (not done, not blocking)
@@ -142,3 +155,8 @@ across DST.
   auto-issues TLS. A commented example is in `deploy/Caddyfile`.
 - The droplet is small (2GB/1vCPU). low_tide is just static nginx so it's light,
   but keep an eye on RAM if HWITW or future siblings grow.
+- **No JS cache-busting.** Scripts load as plain `src="…​.js"` (no `?v=`/hash), so
+  after a handoff that changes JS, a browser can serve a stale cached copy until a
+  hard refresh (this bit us once on the `website 3.zip` `clearListeners` change —
+  the deploy was correct; the browser cache was stale). If it recurs, add a no-cache
+  header for `*.js` in our `nginx.conf` (deploy-layer, doesn't touch her files).
