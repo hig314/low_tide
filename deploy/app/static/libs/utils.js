@@ -55,6 +55,9 @@ function range(a, b=null){
 function arrayIndex(matrix,target){
 	return matrix.findIndex(innerArray => innerArray.length === target.length && innerArray.every((value, index) => value === target[index]));
 }
+function arrayLastIndex(matrix,target){
+	return matrix.findLastIndex(innerArray => innerArray.length === target.length && innerArray.every((value, index) => value === target[index]));
+}
 function arrayIncludes(matrix,target){
 	return matrix.some(innerArray => innerArray.length === target.length && innerArray.every((value, index) => value === target[index]));
 }
@@ -62,4 +65,3 @@ function clearListeners(element){
 	const new_elem = element.cloneNode(true);
 	element.parentNode.replaceChild(new_elem, element);
 }
-console.log(isNum('+63.1'))
