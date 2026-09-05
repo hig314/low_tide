@@ -95,6 +95,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
   </style>
 </head>
 <body>
+  <a id="downloadAnchorElem" style="display:none"></a>
   <div id=mouseover_container class="mouseover" style="display: none; flex-direction: column; gap: 10px; background-color: #f2f2f2; border-radius: 5px; border: 1px solid #bbb; box-shadow: 0 0 8px rgba(0, 0, 0, 0.15); padding: 3px 5px;">
     <label id=mouseover0></label>
     <label id=mouseover1></label>
@@ -149,16 +150,9 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 	  <label id=mouseover1></label>
 	  <label id=mouseover2></label>
     </div> -->
-    <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
-		<div style="display: flex; align-items: center; gap: 5px;">
-		   <label for="standard_group">Requires standard group</label>
-		   <input type="checkbox" id="standard_group">
-		</div>
-		<div style="display: flex; align-items: center; gap: 5px;">
-		   <label for="show_temp">Show temparature</label>
-		   <input type="checkbox" id="show_temp">
-		</div>
-	    <label id=surveys style="margin-left: -10px;"></label>
+    <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-left: 10px; margin-right: -10px;">
+		<div id=options_select></div>
+	    <label id=surveys style="margin-left: 0px;"></label>
     </div>
     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
 	  <div id=speicies_select></div>
@@ -190,10 +184,12 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 		  <option>Smoothed low</option>
 		  <option>Smoothed medium</option>
 		  <option>Smoothed high</option>
+		  <option>Month bins</option>
+		  <option>3-month bins</option>
+		  <option>Year bins</option>
 	  </select>
 	  <select id=scaling>
 		  <option>Linear</option>
-		  <option>Square-root</option>
 		  <option>Logarithmic</option>
 	  </select>
     </div>
@@ -223,6 +219,8 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
   
   <script src="seldovia_sheet.js"></script>
   <script src="costal_studies_sheet.js"></script>
+  <script src="seldovia_locations.js"></script>
+  <script src="costal_studies_locations.js"></script>
   <script src="temp_data.js"></script>
   
   <script src="file_initalization.js"></script>
