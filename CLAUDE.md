@@ -1,6 +1,6 @@
 # low_tide — project state
 
-Snapshot for resuming after a break. Last worked: 2026-06-30.
+Snapshot for resuming after a break. Last worked: 2026-09-04.
 
 ## What this is
 
@@ -11,12 +11,14 @@ alongside **HWITW** (How Weird is the Weather) on a shared DigitalOcean droplet.
 This folder holds the source (zipped + extracted) and the **deployment framework**
 I built. The app source itself is deployed **verbatim — no source edits**.
 
-**Handoffs:** the collaborator ships new versions as zip files. A zip may be a
-**full** tree (mirror into `deploy/app/` with rsync `--delete`) or a **partial**
-set of just-changed files (copy those files in — do NOT `--delete`, that would wipe
-the tree). Workflow each time: unzip → diff against `deploy/app/` → apply → smoke-test
-locally → deploy → verify live → `git add -A && commit && push` (one commit per
-handoff, so her versions diff cleanly). Handoff history:
+**Handoffs:** as of 2026-09-04 the collaborator (katmai-mckittrick on GitHub)
+**pushes directly to this repo's `main`** — no more zips. Workflow each time:
+`git fetch` → review `git diff main..origin/main` (watch for new generated blobs,
+new asset references, case-sensitivity) → `git pull` → deploy → **run a manual
+data refresh (SOP — always, see below)** → verify live → commit+push any
+deploy-layer changes of ours. (Zip-era workflow, if one ever arrives again:
+unzip → diff → apply into `deploy/app/` → same from "deploy" on; one commit per
+handoff.) Handoff history:
 - `website.zip` — initial deploy (2026-06-08).
 - `website 2.zip` — 2026-06-29 (full): split the data into **two datasets** (Seldovia +
   Coastal studies) with an area selector; bigger temp data.
@@ -27,6 +29,14 @@ handoff, so her versions diff cleanly). Handoff history:
   non-200, `print`+`return` instead of `raise`, so a NOAA outage no longer aborts
   the whole refresh (Google Sheets still update; temp stays last-good). Directly
   addresses the NOAA fragility noted in "Data refresh (cron)".
+- **git push** — 2026-09-04 (9 commits, first git-based handoff): adds **location
+  data** — `download.py` now also generates `static/seldovia_locations.js` +
+  `static/costal_studies_locations.js` (from new "Location info" sheet tabs;
+  `Get_data.py` grew gid/tab URL params), `index_lt.html` loads both; big
+  `low_tide_data_analasis.js` rework; deletes the unused `static/noUiSlider-15.8.1/`
+  duplicate (page always used `libs/nouislider/`). Deploy-layer changes ours:
+  refresh.sh now publishes 5 blobs, deploy rsync excludes 6, cron fixed to true
+  4 AM Anchorage.
 
 ## Current status: DEPLOYED & LIVE ✅
 
@@ -41,8 +51,12 @@ assigned, so everything survives a droplet reboot. Safe to walk away.
 - **The app is 100% static.** `static/index_lt.html` + JS with pre-baked data.
   Two datasets, picked via the area selector (`<select id=area_select>`):
   `static/seldovia_sheet.js` (~2.7MB) and `static/costal_studies_sheet.js` (~558KB),
-  plus shared `static/Temp_data.js` (~758KB). (The old single `static/sheet.js` was
-  retired in the 2026-06-29 handoff.) The frontend makes **zero** backend calls.
+  plus shared `static/Temp_data.js` (~758KB) and, since 2026-09-04, two location
+  blobs `static/seldovia_locations.js` + `static/costal_studies_locations.js`.
+  ⚠️ The location blobs are **generated-only — not in git**; they exist solely on
+  the droplet (published by the refresh). That makes their rsync excludes
+  load-bearing: without them, `--delete` wipes them off the live site.
+  The frontend makes **zero** backend calls.
   It's served by plain `nginx:alpine` with the `static/` dir as the web root, so
   assets resolve at `/` (e.g. `/seldovia_sheet.js`), **not** under `/static/`.
 - **`webapp.py` is dead weight here.** It's a vestigial copy of HWITW's Flask
@@ -102,21 +116,31 @@ is applied into `deploy/app/` and committed, so her versions diff cleanly.
     ssh root@164.92.75.176 'docker logs lowtide --tail 50'
 
     # redeploy after changing app content or the framework (from deploy/).
-    # NOTE: the four data-blob excludes are deliberate — the cron owns live data;
-    # a code handoff must not clobber freshly-fetched blobs (rsync also won't
-    # --delete excluded files on the remote). See "Data refresh (cron)" below.
+    # NOTE: the six data-blob excludes are deliberate — the cron owns live data;
+    # a code handoff must not clobber freshly-fetched blobs, and the two
+    # *_locations.js blobs exist ONLY on the droplet (not in git), so without
+    # their excludes --delete would remove them from the live site. (rsync won't
+    # --delete excluded files on the remote.) See "Data refresh (cron)" below.
     rsync -az --delete --exclude '.DS_Store' --exclude '__pycache__' --exclude '._*' \
       --exclude 'static/seldovia_sheet.js' --exclude 'static/costal_studies_sheet.js' \
       --exclude 'static/Temp_data.js' --exclude 'static/temp_data.js' \
+      --exclude 'static/seldovia_locations.js' --exclude 'static/costal_studies_locations.js' \
       docker-compose.yml nginx.conf app  root@164.92.75.176:/opt/lowtide/
     ssh root@164.92.75.176 '
       cp -f /opt/lowtide/app/static/Temp_data.js /opt/lowtide/app/static/temp_data.js
       chmod -R a+rX /opt/lowtide/app
       cd /opt/lowtide && docker compose up -d'
 
-    # data blobs refresh AUTOMATICALLY via cron (see below) — no manual step needed.
-    # To force a refresh now:
+    # SOP: ALWAYS run a manual data refresh after a code deploy (a code update can
+    # add/change generated blobs — e.g. the 2026-09-04 one added the location
+    # blobs, which 404 until the refresh publishes them — and the refresh proves
+    # the new pipeline runs). The cron also refreshes daily on its own.
     ssh root@164.92.75.176 'REFRESH_BACKOFF=5 /opt/lowtide/refresh/refresh.sh; tail -5 /opt/lowtide/refresh/refresh.log'
+
+    # if refresh.sh itself changed, rsync it too and restore the execute bit
+    # (rsync -a copies local perms; a chmod-stripped local copy bit us once):
+    rsync -az refresh/refresh.sh root@164.92.75.176:/opt/lowtide/refresh/refresh.sh
+    ssh root@164.92.75.176 'chmod +x /opt/lowtide/refresh/refresh.sh'
 
     # verify live after deploy (Caddy routes lowtide on Host: 209.38.5.101; assets at /)
     curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: 209.38.5.101' \
@@ -126,14 +150,18 @@ is applied into `deploy/app/` and committed, so her versions diff cleanly.
 
 Live data blobs refresh **daily at 04:00 America/Anchorage** on the droplet via
 `/opt/lowtide/refresh/refresh.sh` (source: `deploy/refresh/`, full notes in
-`deploy/refresh/README.md`). Cron uses `CRON_TZ=America/Anchorage` so 4 AM holds
-across DST.
+`deploy/refresh/README.md`). Ubuntu's ISC cron **ignores `CRON_TZ`** (the
+original setup silently fired at 4 AM UTC); since 2026-09-04 the crontab fires at
+**12:00 and 13:00 UTC** with a guard (`TZ=America/Anchorage date +\%H` = 04) so
+exactly one runs at true 4 AM Anchorage, tracking DST.
 
 - **Runs her `download.py` UNMODIFIED** in a staging dir `/opt/lowtide/refresh/work/`
-  (our own venv with `requests`), then publishes the 3 regenerated blobs into the
-  live `app/static/` and recreates the lowercase `temp_data.js` alias.
-- **Sources (public, no auth):** 2 Google Sheets (Seldovia + Costal studies) and
-  NOAA station 9455500 water temperature. The NOAA temp fetch is **incremental**
+  (our own venv with `requests`), then publishes the 5 regenerated blobs (2 sheet
+  + 2 location + temp) into the live `app/static/` and recreates the lowercase
+  `temp_data.js` alias.
+- **Sources (public, no auth):** 2 Google Sheets (Seldovia + Costal studies, now
+  2 tabs each: observations + "Location info") and NOAA station 9455500 water
+  temperature. The NOAA temp fetch is **incremental**
   and stateful — the `Temp_data` pickle lives in `work/` and must persist; never
   delete it (else it refetches from 2004).
 - **Isolation = cron owns data, handoffs own code.** The deploy rsync excludes the

@@ -13,7 +13,9 @@ This is **our infrastructure** — it runs the collaborator's `download.py`
 2. Runs `download.py` there (in our venv) to regenerate the data blobs from:
    - **Google Sheets** (Seldovia "Master list" + "Costal studies") — public CSV export.
    - **NOAA Tides & Currents** station 9455500 — incremental water temperature.
-3. On success, copies the three regenerated blobs into the live served dir
+3. On success, copies the five regenerated blobs (`seldovia_sheet.js`,
+   `costal_studies_sheet.js`, `Temp_data.js`, `seldovia_locations.js`,
+   `costal_studies_locations.js`) into the live served dir
    `/opt/lowtide/app/static/` and recreates the lowercase `temp_data.js` alias.
 
 The **`Temp_data` pickle** in `work/` is stateful (incremental temp fetch back
@@ -29,18 +31,30 @@ code update never overwrites freshly-fetched live data:
     --exclude 'static/costal_studies_sheet.js'
     --exclude 'static/Temp_data.js'
     --exclude 'static/temp_data.js'
+    --exclude 'static/seldovia_locations.js'
+    --exclude 'static/costal_studies_locations.js'
 
-(rsync does not delete excluded files on the remote either, so `--delete` is safe.)
-They stay tracked in git (they arrive in her zips), so handoff diffs stay clean;
-live and repo copies intentionally diverge. To force-push her version of a blob
-once, drop its `--exclude` for that single deploy.
+(rsync does not delete excluded files on the remote either, so `--delete` is safe.
+That last point is load-bearing for the two `*_locations.js` blobs: they are
+generated-only — NOT in git at all — so without the exclude, `--delete` would
+wipe them off the droplet on every deploy.)
+The other three blobs stay tracked in git (they arrived in her zips), so handoff
+diffs stay clean; live and repo copies intentionally diverge. To force-push her
+version of a blob once, drop its `--exclude` for that single deploy.
+
+**SOP: after every code deploy, run a manual refresh** (see Ops below). Code
+updates can add new generated blobs or change blob contents (e.g. the 2026-09-04
+update added the two `*_locations.js` files, which the page 404s on until the
+refresh publishes them), and the refresh also proves the new pipeline runs.
 
 ## Failure behavior
 
-Log-only. NOAA's `water_temperature` product 5xx's intermittently, and her code
-raises on any non-200 (temp is fetched first, so a blip aborts the whole run).
-`refresh.sh` retries a few times, and if it still fails it **keeps the last-good
-live data** and logs it. The incremental temp fetch backfills automatically on
+Log-only. NOAA's `water_temperature` product 5xx's intermittently; since the
+2026-06-30 update her `Get_temp_data.py` skips (print+return) on a non-200
+instead of raising, so a NOAA blip no longer aborts the run — Sheets still
+refresh and temp holds at last-good. `refresh.sh` still retries a few times on
+hard failures, and if a run still fails it **keeps the last-good live data**
+and logs it. The incremental temp fetch backfills automatically on
 the next success, so a skipped day self-heals.
 
 ## Ops
@@ -62,6 +76,15 @@ the next success, so a skipped day self-heals.
       /opt/lowtide/refresh/venv/bin/pip install -q --upgrade pip requests
       cp -f /opt/lowtide/app/Temp_data /opt/lowtide/refresh/work/Temp_data   # seed incremental state
     '
-    # deploy refresh.sh, then install crontab:
-    #   CRON_TZ=America/Anchorage
-    #   0 4 * * * /opt/lowtide/refresh/refresh.sh
+    # deploy refresh.sh, then install crontab (see below):
+    #   0 12,13 * * * [ "$(TZ=America/Anchorage date +\%H)" = "04" ] && /opt/lowtide/refresh/refresh.sh
+
+## Why the odd cron line (true 4 AM Anchorage across DST)
+
+Ubuntu's stock ISC cron does **not** support `CRON_TZ` (it's silently treated as
+a plain env var) — the original `CRON_TZ=America/Anchorage` + `0 4 * * *` setup
+actually fired at 04:00 **UTC** (~8 PM Anchorage). The fix: fire at both 12:00
+and 13:00 UTC (4 AM AKDT and 4 AM AKST respectively) with a guard that only runs
+the script when the current Anchorage hour is 04. Exactly one of the two fires
+each day, and it tracks DST with no droplet timezone change. `%` is escaped as
+`\%` because cron treats a bare `%` as a newline.

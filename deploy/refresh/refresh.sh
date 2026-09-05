@@ -31,7 +31,7 @@ PY="$VENV/bin/python"
 RETRIES="${REFRESH_RETRIES:-3}"
 BACKOFF="${REFRESH_BACKOFF:-120}"   # seconds between retries (override for testing)
 
-BLOBS=(seldovia_sheet.js costal_studies_sheet.js Temp_data.js)
+BLOBS=(seldovia_sheet.js costal_studies_sheet.js Temp_data.js seldovia_locations.js costal_studies_locations.js)
 
 log(){ echo "$(date '+%Y-%m-%d %H:%M:%S%z') $*" >> "$LOG"; }
 
