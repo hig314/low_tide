@@ -31,7 +31,17 @@ def invert_grid(grid):
 
 Get_temp_data.update_data(datetime.datetime.today())
 
-Get_data.get_data('1QojE91feA1K6smMq1K0LCHQhEgz35Ms-3NbDTu_FwsI','low tide checklist - Master list of observations and species')
+with open('Temp_data', 'rb') as f:
+    data = pickle.load(f)
+
+json_data = json.dumps(data, indent=4)
+
+js_data = f"const temp_data = {json_data};"
+
+with open("static/Temp_data.js", "w", encoding="utf-8") as js:
+    js.write(js_data)
+
+Get_data.get_data('1QojE91feA1K6smMq1K0LCHQhEgz35Ms-3NbDTu_FwsI',0,'low tide checklist - Master list of observations and species')
 #Get_data.get_data('1U7PNDsK2hTRfWDPedC3Iw2RF1-07-P7rkulNGLEcQbo')
 
 with open("low tide checklist - Master list of observations and species.csv", newline='') as csvfile:
@@ -44,17 +54,20 @@ js_data = f"const seldovia_raw_data = {json_data};"
 with open("static/seldovia_sheet.js", "w", encoding="utf-8") as js:
     js.write(js_data)
 
-with open('Temp_data', 'rb') as f:
-    data = pickle.load(f)
+Get_data.get_data('1QojE91feA1K6smMq1K0LCHQhEgz35Ms-3NbDTu_FwsI',1257520604,'low tide checklist - Location info')
+
+with open("low tide checklist - Location info.csv", newline='') as csvfile:
+    data = list(csv.reader(csvfile))
 
 json_data = json.dumps(data, indent=4)
 
-js_data = f"const temp_data = {json_data};"
+js_data = f"const seldovia_location_data = {json_data};"
 
-with open("static/Temp_data.js", "w", encoding="utf-8") as js:
+with open("static/seldovia_locations.js", "w", encoding="utf-8") as js:
     js.write(js_data)
 
-Get_data.get_data('1VUVVE64tU2a8D6C8tn8jFhbHn97xDn5l','Costal studies intertidal data sheet')
+
+Get_data.get_data('1VUVVE64tU2a8D6C8tn8jFhbHn97xDn5l',269933728,'Costal studies intertidal data sheet')
 
 with open("Costal studies intertidal data sheet.csv", newline='') as csvfile:
     data = list(csv.reader(csvfile))
@@ -66,6 +79,18 @@ json_data = json.dumps(data, indent=4)
 js_data = f"const costal_studies_raw_data = {json_data};"
 
 with open("static/costal_studies_sheet.js", "w", encoding="utf-8") as js:
+    js.write(js_data)
+
+Get_data.get_data('1VUVVE64tU2a8D6C8tn8jFhbHn97xDn5l',68618454,'Costal studies intertidal data sheet - Location info')
+
+with open("Costal studies intertidal data sheet - Location info.csv", newline='') as csvfile:
+    data = list(csv.reader(csvfile))
+
+json_data = json.dumps(data, indent=4)
+
+js_data = f"const costal_studies_location_data = {json_data};"
+
+with open("static/costal_studies_locations.js", "w", encoding="utf-8") as js:
     js.write(js_data)
 
 
