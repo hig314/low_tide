@@ -17,9 +17,12 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 
 import requests
 
-def get_data(sheet_id,filename):
-    file_format = "csv" 
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format={file_format}"
+def get_data(sheet_id,tab,filename,url_type = 0):
+    file_format = "csv"
+    if url_type == 0:
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format={file_format}&gid={tab}"
+    elif url_type == 1:
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={tab}&headers=1"
     response = requests.get(url)
     if response.status_code == 200:
         filename = f"{filename}.{file_format}"
