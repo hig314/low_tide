@@ -47,16 +47,23 @@ class MultiselectDropdown {
 		}
 		this.open = !this.open
 	}
-	addOption(title){
+	addOption(value,title=null){
+		if (title === null){
+			title = value
+		}
 		let label = makeNewElement(this.menu,'label',{'class':'dropdownlabel'})
 		this.labels.push(label)
-		this.names.push(title)
+		this.names.push(value)
 		let checkbox = makeNewElement(label,'input',{'class':'dropdownbox','type':'checkbox'})
 		label.append(title);
 		const l = this.length
-		checkbox.addEventListener('change', () => this.handeler(title));
+		checkbox.addEventListener('change', () => this.handeler(value));
 		this.checkboxes.push(checkbox)
 		this.length ++
+	}
+	updateTitle(name,title){
+		let ind = this.names.indexOf(name);
+		this.labels[ind].childNodes[1].nodeValue = title; 
 	}
 	removeOption(name){
 		let i = this.selected.indexOf(name);
@@ -107,7 +114,7 @@ class MultiselectDropdown {
 		}
 	}
 	get(){
-		return this.selected
+		return this.selected.slice()
 	}
 	updateLabel(label){
 		this.header.innerHTML = label
@@ -147,13 +154,20 @@ class ButtonDropdown {
 		}
 		this.open = !this.open
 	}
-	addOption(title){
+	addOption(value,title=null){
+		if (title === null){
+			title = value
+		}
 		let label = makeNewElement(this.menu,'label',{},title)
 		this.labels.push(label)
-		this.names.push(title)
+		this.names.push(value)
 		const l = this.length
-		label.addEventListener('click', () => this.handeler(title));
+		label.addEventListener('click', () => this.handeler(value));
 		this.length ++
+	}
+	updateTitle(name,title){
+		let ind = this.names.indexOf(name);
+		this.labels[ind].innerHTML = title
 	}
 	removeOption(name){
 		let ind = this.names.indexOf(name);
