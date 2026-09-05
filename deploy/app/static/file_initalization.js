@@ -87,6 +87,50 @@ function get_names(filename) {
     return cliped_names;
 }
 
+function get_scientific_names(filename) {
+    if( Object.keys(custom_files).includes(filename) ) {
+        let sci_dict = {};
+        for( let speices of custom_files[filename] ) {
+            sci_dict[speices[0]] = speices[1];
+        }
+        sci_dict['biodiversity'] = 'biodiversity';
+        return sci_dict;
+    }
+	let column = get_columns()
+    let name_column = invert_grid(raw_data.slice())[column.indexOf('common name')];
+    let sci_column = invert_grid(raw_data.slice())[column.indexOf('scientific name')];
+    let info_column = invert_grid(raw_data.slice())[column.indexOf('data analasys info')];
+    let sci_dict = {};
+    let names = get_names(filename);
+    for( let [ i,info ] of info_column.entries() ) {
+		let name = undefined
+        if( info.split('$').length === 4 ) {
+            name = name_column[i];
+        } else {
+            name = info.split('$')[0];
+        }
+        if( names.includes(name) ) {
+            sci_dict[name] = sci_column[i];
+        }
+    }
+    sci_dict['biodiversity'] = 'biodiversity';
+    return sci_dict;
+}
+
+function get_loc_data(loc_sheet){
+	let columns = loc_sheet[0]
+	loc_sheet = loc_sheet.slice(1)
+	let loc_ind = columns.indexOf('Location')
+	let key_ind = columns.indexOf('Keyword')
+	let shape_ind = columns.indexOf('Shape')
+	let color_ind = columns.indexOf('Color')
+	let loc_data = {}
+	for (let loc of loc_sheet){
+		loc_data[loc[loc_ind]] = {'key':loc[key_ind],'shape':loc[shape_ind],'color':loc[color_ind]}
+	}
+	return loc_data
+}
+
 function get_colors(filename) {
     if( Object.keys(custom_files).includes(filename) ) {
         let colors = {};
@@ -155,6 +199,7 @@ function get_file(filename) {
     let mid_file = [];
     let names = get_names(filename);
     let save_names = [];
+	let sci_names = [];
     let save_groups = [];
     let categories = [];
     let groups = get_groups(filename);
