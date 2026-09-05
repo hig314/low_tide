@@ -14,6 +14,7 @@
 //OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 var raw_data = []
+var location_data = []
 var do_notes = true
 
 function sum(list){
@@ -259,8 +260,9 @@ class CrabVisualizationFrame {
         this.has_canvas = false;
         this.is_active = false;
         this.is_redrawing = true;
+		this.MDS_download = false
 		
-		
+		document.onkeydown = (event) => this.keypress(event)
 
         if( inital_data === null ) {
             this.data_cat = 'Seldovia';
@@ -271,11 +273,14 @@ class CrabVisualizationFrame {
 			raw_data = seldovia_raw_data
 			do_notes = true
 			custom_files = seldovia_custom_files
+			location_data = get_loc_data(seldovia_location_data)
 		} else if (this.data_cat === 'Coastal studies') {
 			raw_data = costal_studies_raw_data
 			do_notes = false
 			custom_files = costal_studies_custom_files
+			location_data = get_loc_data(costal_studies_location_data)
 		}
+		console.log(location_data)
 		document.getElementById('area_select').addEventListener('change', (event) => this.select_area(event.target.value));
 		
 		let files = get_filenames()
@@ -291,7 +296,7 @@ class CrabVisualizationFrame {
 
         let [data, categories] = cleanup(get_file(files[file]));
 		this.data = data
-        this.file = {"display_name":files[file],'color_dict':get_colors(files[file])};
+        this.file = {"display_name":files[file],'color_dict':get_colors(files[file]),'sci_names':get_scientific_names(files[file])};
         this.crabs = Object.keys(Object.values(this.data)[0][0]['crabs']);
 		
 		this.categorie_list = [...new Set(categories.slice().flat())]
@@ -386,34 +391,25 @@ class CrabVisualizationFrame {
 
 		this.tide_silder.noUiSlider.on('update', (values, handle) => {
 	  	    this.run_canvas()});
-
-        this.requires_stndard = document.getElementById('standard_group')
-        if( inital_data ) {
-            this.requires_stndard.checked = inital_data['requires_stndard']
-        }
-		this.requires_stndard.addEventListener('change', () => this.run_canvas());
-		
-        this.temp = document.getElementById('show_temp')
-        if( inital_data ) {
-            this.temp.checked = inital_data['temp']
-        }
-        this.temp.addEventListener('change', () => this.run_canvas());
-
-        // this.point_count = Label(self, {text: '' });
-//         this.point_count.grid( {row: 2,column: 7 });
-//
-//         this.mouseover_label = Label(self, {text: '' });
-//         this.mouseover_label.grid( {row: 0,column: 6 });
-//         this.mouseover_label2 = Label(self, {text: '' });
-//         this.mouseover_label2.grid( {row: 1,column: 6 });
-//         this.mouseover_label3 = Label(self, {text: '' });
-//         this.mouseover_label3.grid( {row: 2,column: 6 });
+			
+		this.options = new MultiselectDropdown(document.getElementById('options_select'), {label: "Options",listener: (selected) => this.select_options(selected), auto_close: false});
+		this.options.addOption('requires_stndard','Requires standard group');
+		this.options.addOption('temp','Show temparature');
+		this.options.addOption('sci_names','Use scientific names');
+		this.options.addOption('shapes','Use location shapes in scatter plot');
 
         this.selected_crabs = [];
         this.crab_menu = new MultiselectDropdown(document.getElementById('speicies_select'), {label: "No crabs",listener: (selected) => this.select_crab(selected)});
-        for( let [ index,label ] of this.crabs.entries() ) {
-            this.crab_menu.addOption(label);
-        }
+		if (this.options.get().includes("sci_names")){
+	        for( let [ index,label ] of this.crabs.entries() ) {
+	            this.crab_menu.addOption(label,this.file['sci_names'][label]);
+	        }
+		} else {
+	        for( let [ index,label ] of this.crabs.entries() ) {
+	            this.crab_menu.addOption(label);
+	        }
+		}
+        
         this.crab_menu.set(this.crabs,[],true);
 		
 		this.all_crabs_button = document.getElementById('select')
@@ -509,23 +505,52 @@ class CrabVisualizationFrame {
         this.is_active = true;
         this.run_canvas();
     }
+	
+	keypress(event){
+	    var key = event.keyCode || event.charCode;
+		console.log(key)
+		if (key == 18) {
+			//this.MDS_download = true
+			this.run_canvas()
+		}
+	}
 
     run_canvas() {
         if( this.is_active ) {
-			console.log('ran')
+			let options = this.options.get()
             this.canvas.graph_data(this.location_menu.get(),this.crab_menu.get(),
                                this.visualization_menu.value,this.smoothing_menu.value,this.scaling_menu.value,this.orginization_menu.value,this.graph_menu.value,
                                this.year_silder.noUiSlider.get(true)[0],this.year_silder.noUiSlider.get(true)[1],
                                 this.max_silder.noUiSlider.get(true)[0],this.max_silder.noUiSlider.get(true)[1],
                                this.tide_silder.noUiSlider.get(true)[1],this.tide_silder.noUiSlider.get(true)[0],
-                               this.requires_stndard.checked,this.temp.checked);
+								options,this.MDS_download);
+			this.MDS_download = false
         }
     }
+	select_options(options){
+		this.is_active = false
+		if (options.includes("sci_names")){
+	        for( let [ index,label ] of this.crabs.entries() ) {
+	            this.crab_menu.updateTitle(label,this.file['sci_names'][label]);
+	        }
+		} else {
+	        for( let [ index,label ] of this.crabs.entries() ) {
+	            this.crab_menu.updateTitle(label,label);
+	        }
+		}
+		this.select_crab(this.crab_menu.get())
+		this.is_active = true
+		this.run_canvas()
+	}
     select_crab(crabs) {
         if( crabs.length === 0 ) {
             this.crab_menu.updateLabel('No ' + this.file['display_name']);
         } else if( (crabs.length) === 1 ) {
-            this.crab_menu.updateLabel(crabs[0]);
+			if (this.options.get().includes("sci_names")){
+		        this.crab_menu.updateLabel(this.file['sci_names'][crabs[0]]);
+			} else {
+		        this.crab_menu.updateLabel(crabs[0]);
+			}
 		} else if( (crabs.length) < this.crabs.length ) {
             this.crab_menu.updateLabel('Custom ' + this.file['display_name']);
 		} else {
@@ -560,7 +585,7 @@ class CrabVisualizationFrame {
 		this.categories_menu.removeAll()
         let [data, categories] = cleanup(get_file(file));
 		this.data = data
-        this.file = {"display_name":file,'color_dict':get_colors(file)};
+        this.file = {"display_name":file,'color_dict':get_colors(file),'sci_names':get_scientific_names(file)};
         this.crabs = Object.keys(Object.values(this.data)[0][0]['crabs']);
 		
 		this.categorie_list = [...new Set(categories.slice().flat())]
@@ -577,14 +602,37 @@ class CrabVisualizationFrame {
 		}
 		
         this.selected_file = this.file["display_name"];
-        for( let [ index,label ] of this.crabs.entries() ) {
-            this.crab_menu.addOption(label);
-        }
+		if (this.options.get().includes("sci_names")){
+	        for( let [ index,label ] of this.crabs.entries() ) {
+	            this.crab_menu.addOption(label,this.file['sci_names'][label]);
+	        }
+		} else {
+	        for( let [ index,label ] of this.crabs.entries() ) {
+	            this.crab_menu.addOption(label);
+	        }
+		}
+
         for( let label of this.categorie_list ) {
             this.categories_menu.addOption(label);
         }
 		
 		this.canvas.update(this.data,this.file['color_dict'])
+		let locs = this.location_menu.get()
+		this.location_menu.removeAll()
+        for( let label of Object.keys(this.data) ) {
+            this.location_menu.addOption(label);
+        }
+		console.log(locs)
+        this.location_menu.set(locs,[],false)
+        if( locs.length === 0 ) {
+            this.location_menu.updateLabel('No locations');
+        } else if( (locs.length) === 1 ) {
+            this.location_menu.updateLabel(locs[0]);
+		} else if( (locs.length) < Object.keys(this.data).length ) {
+            this.location_menu.updateLabel('Custom locations');
+		} else {
+            this.location_menu.updateLabel('All locations');
+        }
         this.crab_menu.set(this.crabs,[],true);
     }
 	reset(ind){
@@ -632,10 +680,12 @@ class CrabVisualizationFrame {
 			raw_data = seldovia_raw_data
 			do_notes = true
 			custom_files = seldovia_custom_files
+			location_data = get_loc_data(seldovia_location_data)
 		} else if (this.data_cat === 'Coastal studies') {
 			raw_data = costal_studies_raw_data
 			do_notes = false
 			custom_files = costal_studies_custom_files
+			location_data = get_loc_data(costal_studies_location_data)
 		}
 		this.reset(0)
 		this.location_menu.removeAll()
@@ -720,7 +770,8 @@ class CrabVisualizationFrame {
 		this.x_size = page_width-200
 		this.y_size = 600
 		this.padding = 50
-	    this.draw = SVG().addTo('#canvas').size( page_width, 720);
+		this.y_extra = 90
+	    this.draw = SVG().addTo('#canvas').size( page_width, this.y_size+this.y_extra);
 	    this.draw.attr({
 	        'shape-rendering':'crispEdges'
 	    });
@@ -748,11 +799,11 @@ class CrabVisualizationFrame {
         this.crab_colors = crab_colors;
 	}
 
-    graph_data(locations,crabs,visualization_type,smoothing_type,scaling_type,orginization_type,graph_type,year_s,year_e,max_s,max_e,tide_s,tide_e,requres_standard,temp) {
-		
+    graph_data(locations,crabs,visualization_type,smoothing_type,scaling_type,orginization_type,graph_type,year_s,year_e,max_s,max_e,tide_s,tide_e,options,MDS_download) {
+		console.log(MDS_download)
 		let page_width = document.documentElement.clientWidth;
 		this.x_size = page_width-200
-		this.draw.size(page_width,720)
+		this.draw.size(page_width,this.y_size+this.y_extra)
         let error = false;
         if( orginization_type === 'Locational' ) {
             if( smoothing_type !== 'No smoothing' ) {
@@ -778,16 +829,6 @@ class CrabVisualizationFrame {
                 error = true;
             }
 		}
-		else if ( graph_type === 'Stacked' ){
-            if( visualization_type === 'Relative to average' ) {
-                this.master.display_error('Cannot stack while in relative to average');
-                error = true;
-            }
-            if( visualization_type === 'Percent relative to average' ) {
-                this.master.display_error('Cannot stack while in percent relative to average');
-                error = true;
-            }
-		}
 		if ( crabs.includes('biodiversity') ){
             if( visualization_type === 'Percent' ) {
                 this.master.display_error('Biodiversity is meaningles while in percent');
@@ -798,6 +839,12 @@ class CrabVisualizationFrame {
                 error = true;
             }
 		}
+		if (["Month bins","3-month bins","Year bins"].includes(smoothing_type)){
+			if (options.includes("shapes") && graph_type === 'Scatter-plot'){
+				this.master.display_error("Location shapes don't work with bining");
+				error = true;
+			}
+		}
         if( !error ) {
             this.master.display_error('');
         }
@@ -807,7 +854,7 @@ class CrabVisualizationFrame {
  	    this.draw.clear()
         data = locations.map(loc =>data[loc]).flat();
 		data.sort((a,b) => get_date_num(a['date'])-get_date_num(b['date']))
-        if( requres_standard ) {
+        if( options.includes("requires_stndard") ) {
             data = data.filter( low_tide => low_tide['is_standard'] );
         }
         let set_days = true;
@@ -829,745 +876,451 @@ class CrabVisualizationFrame {
         }
         data = structuredClone(data.filter( low_tide => days.includes(get_date_num(low_tide['date'])) && low_tide['tide'] < tide_s && low_tide['tide'] > tide_e ));
 		
-        if( orginization_type === 'Seasonal' ) {
-            for( let [ i,low_tide ] of data.entries() ) {
-                low_tide['date'] = get_date_num(low_tide['date'])%365;
-            }
-        }
-        let dupe_dict = {};
-        for( let [ i,low_tide ] of data.entries() ) {
-            let date = get_date_num(low_tide['date']);
-			
-            dupe_dict[date] ??= [];
-            dupe_dict[date].push(i);
-        }
-        for( let date of Object.keys(dupe_dict) ) {
-            for( let [ i,index ] of dupe_dict[date].entries() ) {
-				
-                data[index]['date'] = parseInt(date)+i*0.001;
-            }
-        }
+		this.organize(data,orginization_type,locations)
+		
+        //let dupe_dict = {};
+        // for( let [ i,low_tide ] of data.entries() ) {
+//             let date = low_tide['date'];
+//
+//             dupe_dict[date] ??= [];
+//             dupe_dict[date].push(i);
+//         }
+//         for( let date of Object.keys(dupe_dict) ) {
+//             for( let [ i,index ] of dupe_dict[date].entries() ) {
+//
+//                 data[index]['date'] = parseInt(date)+i*0.001;
+//             }
+//         }
         data.sort((a,b) => get_date_num(a['date'])-get_date_num(b['date']))
         if( data.length === 0 ) {
 			console.log('no data')
             return;
         }
         let speicies_list = Object.keys(data[0]['crabs']);
+		
         for( let low_tide of data ) {
             for( let speicies of speicies_list ) {
                 if( scaling_type === 'square root' ) {
                     low_tide['crabs'][speicies][0] = Math.sqrt(low_tide['crabs'][speicies][0]);
-                } else if( scaling_type === 'logarithmic' ) {
+                } else if( scaling_type === 'Logarithmic' ) {
                     low_tide['crabs'][speicies][0] = Math.log2(low_tide['crabs'][speicies][0]+1);
 }
             }
         }
-        let x_max = days.length;
-        var avgs = range(crabs.length+1).map( i =>0 );
+        let x_max 
+		if ( orginization_type === 'Standard' ){
+			x_max = days.length;
+		} else if( orginization_type === 'Seasonal' ) {
+            x_max = 365;
+        } else if( orginization_type === 'Locational' ) {
+            x_max = locations.length-1;
+		}
         let safe_data = data.filter( low_tide => low_tide['totall'] !== 0 );
         let safe_indexes = data.entries().filter( ( [ i,low_tide ] ) => low_tide['totall'] !== 0 ).map( ( [ i,low_tide ] ) =>i );
         if( !safe_data.length ) {
 			console.log('no safe')
             return;
         }
-        let y_min = 0;
-		let y_max = 0;
-        let k = 0;
-        if( smoothing_type === "Smoothed low" ) {
-            k = 40;
-        } else if( smoothing_type === "Smoothed medium" ) {
-            k = 70;
+		
+		let li = this.run_viz(data, visualization_type, crabs)
+		
+		let d = 0;
+		if ( ["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type)){
+	        let k;
+			let r;
+	        if ( smoothing_type === "Smoothed low" ) {
+	            k = 40;
+				r = 86
+	        } else if( smoothing_type === "Smoothed medium" ) {
+	            k = 70;
+				r = 20
+			}
+	 		else if( smoothing_type === "Smoothed high" ) {
+	            k = 100;
+				r = 26
+			}
+	        if ( orginization_type === 'Seasonal' ) {
+	            k /= 10;
+	        }
+			this.smooth(li,data,k,r)
+		} else if (["Month bins","3-month bins","Year bins"].includes(smoothing_type)){
+	        if ( smoothing_type === "Month bins" ) {
+	            d = 30.436875
+	        } else if( smoothing_type === "3-month bins" ) {
+	            d = 91.310625
+			}
+	 		else if( smoothing_type === "Year bins" ) {
+	            d = 365.2425
+			}
+			[li,data] = this.bin(li,data,d)
+			console.log(structuredClone(data))
+			console.log(structuredClone(li))
 		}
- 		else if( smoothing_type === "Smoothed high" ) {
-            k = 100;
+        
+		
+		if (MDS_download){
+	        this.download_MDS(data,li,crabs);
 		}
-        if( orginization_type === 'Seasonal' ) {
-            k /= 10;
-        }
-        let factor = k/(k+1);
-        if( visualization_type === 'Percent' ) {
-            if( ["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type) ) {
-                let lii = safe_data.map( low_tide => Object.keys(low_tide['crabs']).filter( crab => crabs.includes(crab) ).map( crab =>low_tide['crabs'][crab][0]*100/low_tide['totall'] ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    let vals = [];
-                    for( let j of li ) {
-                        vals.push([]);
-                        for( let i of range(j.length) ) {
-                            let l = Math.max(0,i-13);
-                            let h = Math.min(i+14,j.length);
-                            let m = get_date_num(safe_data[i]['date']);
-                            let div = Math.max(sum( range(h-l).map( n =>factor**Math.abs(get_date_num(safe_data[l+n]['date'])-m) )),1);
-                            vals.at(-1).push(sum( j.slice(l,h).entries().map( ( [ n,x ] ) =>x*(factor**Math.abs(get_date_num(safe_data[l+n]['date'])-m)) ))/div);
-                        }
-                    }
-                    if( graph_type === 'Stacked' ) {
-                        y_max = Math.max(...range(vals[0].length).map( i =>sum( range(vals.length).map( j =>vals[j][i] )) ));
-                    } else {
-                        y_max = Math.max(...vals.map( val =>Math.max(...val) ));
-                    }
-                } else {
-                    y_max = 0;
-                }
-
-            } else if( graph_type === 'Stacked' ) {
-                y_max = Math.max(...safe_data.map( low_tide =>sum( Object.keys(low_tide['crabs']).filter( crab => crabs.includes(crab) ).map( crab =>low_tide['crabs'][crab][0]*100/low_tide['totall'] )) ));
-			} else {
-                y_max = Math.max(...safe_data.map( low_tide => Object.keys(low_tide['crabs']).filter( crab => crabs.includes(crab) ).map( crab =>low_tide['crabs'][crab][0]*100/low_tide['totall'] ) ).flat());
+		
+        this.draw_graph(data,li,x_max,max_s,max_e,days,crabs,visualization_type,smoothing_type,
+                         graph_type,orginization_type,locations,options,d);
+        this.draw_x_scalebar(days,graph_type,orginization_type,locations);
+        let do_svg = false;
+		
+    }
+	
+	organize(data,orginization_type,locations){
+        if( orginization_type === 'Standard' ) {
+            for( let [ i,low_tide ] of data.entries() ) {
+                low_tide['date'] = get_date_num(low_tide['date']);
             }
-        } else if( visualization_type === 'Relative to average' ) {
-            if( ["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type) ) {
-                let lii = data.map( low_tide => Object.entries(crabs.entries).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0] ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    let vals = [];
-                    for( let [ k,j ] of li.entries() ) {
-                        vals.push([]);
-                        let total = 0;
-                        for( let i of range(j.length) ) {
-                            let l = Math.max(0,i-13);
-                            let h = Math.min(i+14,j.length);
-                            let m = get_date_num(data[i]['date']);
-                            let div = Math.max(sum( range(h-l).map( n =>factor**Math.abs(get_date_num(data[l+n]['date'])-m) )),0);
-                            vals.at(-1).push(sum( j.slice(l,h).entries().map( ( [ n,x ] ) =>x*(factor**Math.abs(get_date_num(data[l+n]['date'])-m)) ))/div);
-                            total += vals.at(-1)[i];
-                        }
-                        avgs[k] = total/vals.at(-1).length;
-                    }
-                    y_max = Math.max(...vals.entries().map( ( [ i,val ] ) =>Math.max(...val)-avgs[i] ));
-                    y_min = -y_max;
-                } else {
-                    y_max = 0;
-                }
-            } else {
-                let lii = safe_data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0] ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    for( let [ i,j ] of li.entries() ) {
-                        let total = 0;
-                        for( let val of j ) {
-                            total += val;
-                        }
-                        avgs[i] = total/j.length;
-                    }
-                    y_max = Math.max(...safe_data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0]-avgs[i] ) ).flat());
-                    y_min = -y_max;
-                } else {
-                    y_max = 0;
-                }
-
+        } else if( orginization_type === 'Seasonal' ) {
+            for( let [ i,low_tide ] of data.entries() ) {
+                low_tide['date'] = get_date_num(low_tide['date'])%365;
             }
-		} else if( visualization_type === 'Percent relative to average' ) {
-            if( ["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type) ) {
-                let lii = data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0] ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    let vals = [];
-                    for( let [ k,j ] of li.entries() ) {
-                        vals.push([]);
-                        let total = 0;
-                        for( let i of range(j.length) ) {
-                            let l = max(0,i-13);
-                            let h = min(i+14,j.length);
-                            let m = get_date_num(data[i]['date']);
-                            let div = Math.max(sum( range(h-l).map( n =>factor**Math.abs(get_date_num(data[l+n]['date'])-m) )),1);
-                            vals.at(-1).push(sum( j.slice(l,h).entries().map( ( [ n,x ] ) =>x*(factor**Math.abs(get_date_num(data[l+n]['date'])-m)) ))/div);
-                            total += j[i];
-                        }
-                            //total += vals.at(-1).at(-1)
-                        avgs[k] = total/j.length;
-                    }
-                    y_max = Math.max(...enumerate(vals).map( ( [ i,val ] ) =>Math.max(...val)*100/Math.max(avgs[i],0.01)-100 ));
-                    y_min = -y_max;
-                } else {
-                    y_max = 0;
-                }
-            } else {
-                let lii = safe_data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0] ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    for( let [ i,j ] of li.entries() ) {
-                        let total = 0;
-                        for( let val of j ) {
-                            total += val;
-                        }
-                        avgs[i] = total/j.length;
-                    }
-                    y_max = Math.max(...safe_data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0]*100/Math.max(avgs[i],0.01)-100 ) ).flat());
-                    y_min = -y_max;
-                } else {
-                    y_max = 0;
-                }
-
-            }
-		} else if( visualization_type === 'Percent of the way to average' ) {
-            if( ["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type) ) {
-                let lii = data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0] ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    let vals = [];
-                    for( let [ k,j ] of li.entries() ) {
-                        vals.push([]);
-                        let total = 0;
-                        for( let i of range(j.length) ) {
-                            let l = Math.max(0,i-13);
-                            let h = Math.min(i+14,j.length);
-                            let m = get_date_num(data[i]['date']);
-                            let div = Math.max(sum( range(h-l).map( n =>factor**Math.abs(get_date_num(data[l+n]['date'])-m) )),1);
-                            vals.at(-1).push(sum( j.slice(l,h).entries().map( ( [ n,x ] ) =>x*(factor**Math.abs(get_date_num(data[l+n]['date'])-m)) ))/div);
-							
-                            total += j[i];
-                        }
-                            //total += vals.at(-1).at(-1)
-                        avgs[k] = total/j.length;
-                    }
-
-                    if( graph_type === 'Stacked' ) {
-                        y_max = Math.max(...range(vals[0].length).map( i =>sum( range(vals.length).map( j =>vals[j][i]*100/Math.max(avgs[j],0.01) )) ));
-                    } else {
-                        y_max = Math.max(...vals.entries().map( ( [ i,val ] ) =>Math.max(...val)*100/Math.max(avgs[i],0.01) ));
-                    }
-                    y_min = 0;
-                } else {
-                    y_max = 0;
-                }
-
-            } else if( graph_type === 'Stacked' ) {
-                lii = safe_data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0] ) );
-                li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    for( let [ i,j ] of li.entries() ) {
-                        let total = 0;
-                        for( let val of j ) {
-                            total += val;
-                        }
-                        avgs[i] = total/j.length;
-                    }
-                    y_max = Math.max(...safe_data.map( low_tide =>sum( Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0]*100/Math.max(avgs[i],0.01) )) ));
-                    y_min = 0;
-                } else {
-                    y_max = 0;
-                }
-
-			} else {
-                let lii = safe_data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0] ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    for( let [ i,j ] of li.entries() ) {
-                        let total = 0;
-                        for( let val of j ) {
-                            total += val;
-                        }
-                        avgs[i] = total/j.length;
-                    }
-                    y_max = Math.max(...safe_data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0]*100/Math.max(avgs[i],0.01) ) ).flat());
-                    y_min = 0;
-                } else {
-                    y_max = 0;
-                }
-
-            }
-		} else if( visualization_type === 'Percent of the way to maximum' ) {
-            if( ["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type) ) {
-                let lii = data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0] ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    let vals = [];
-                    for( let [ k,j ] of li.entries() ) {
-                        vals.push([]);
-                        for( let i of range(j.length) ) {
-                            let l = Math.max(0,i-13);
-                            let h = Math.min(i+14,j.length);
-                            let m = get_date_num(data[i]['date']);
-                            let div = Math.max(sum( range(h-l).map( n =>factor**Math.abs(get_date_num(data[l+n]['date'])-m) )),0);
-                            vals.at(-1).push(sum( j.slice(l,h).entries().map( ( [ n,x ] ) =>x*(factor**Math.abs(get_date_num(data[l+n]['date'])-m)) ))/div);
-                        }
-                        avgs[k] = Math.max(...vals.at(-1));
-                    }
-
-                    if( graph_type === 'Stacked' ) {
-                        y_max = Math.max(...range(vals[0].length).map( i =>sum( range(vals.length).map( j =>vals[j][i]*100/Math.max(avgs[j],0.01) )) ));
-                    } else {
-                        y_max = Math.max(...vals.entries().map( ( [ i,val ] ) =>Math.max(...val)*100/Math.max(avgs[i],0.01) ));
-                    }
-                    y_min = 0;
-                } else {
-                    y_max = 0;
-                }
-
-            } else if( graph_type === 'Stacked' ) {
-                let lii = safe_data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0] ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    for( let [ i,j ] of li.entries() ) {
-                        avgs[i] = Math.max(...j);
-                    }
-                    y_max = Math.max(...safe_data.map( low_tide =>sum( Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0]*100/Math.max(avgs[i],0.01) )) ));
-                    y_min = 0;
-                } else {
-                    y_max = 0;
-                }
-
-			} else {
-                let lii = safe_data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0] ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    for( let [ i,j ] of li.entries() ) {
-                        avgs[i] = Math.max(...j);
-                    }
-                    y_max = Math.max(...safe_data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0]*100/Math.max(avgs[i],0.01) ) ).flat());
-                    y_min = 0;
-                } else {
-                    y_max = 0;
-                }
-
-            }
-		} else if( visualization_type === 'Percent of selected' ) {
-			y_max = 100;
-
-            // if( graph_type === 'Stacked' ) {
-//                 y_max = 100;
-//
-//             } else if( ["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type) ) {
-//                 let lii = safe_data.map( low_tide => Object.keys(low_tide['crabs']).filter( crab => crabs.includes(crab) ).map( crab =>low_tide['crabs'][crab][0] ) );
-//                 let li = [];
-//                 for( let i of range(lii[0].length) ) {
-//                     li.push( lii.map( x =>x[i] ));
-//                 }
-//                 if( li.length ) {
-//                     let tides = range(lii.length).map( i =>[] );
-//                     for( let j of li ) {
-//                         for( let i of range(j.length) ) {
-//                             let l = Math.max(0,i-13);
-//                             let h = Math.min(i+14,j.length);
-//                             let m = get_date_num(safe_data[i]['date']);
-//                             let div = Math.max(sum( range(h-l).map( n =>factor**Math.abs(get_date_num(safe_data[l+n]['date'])-m) )),1);
-//                             tides[i].push(sum( j.slice(l,h).entries().map( ( [ n,x ] ) =>x*(factor**Math.abs(get_date_num(safe_data[l+n]['date'])-m)) ))/div);
-//                         }
-//
-//                     }
-//                     let totals = [];
-//                     let vals = [];
-//                     for( let tide of tides ) {
-//                         totals.push(Math.max(sum(tide),1));
-//                     }
-//
-//                     for( let [ i,tide ] of tides.entries() ) {
-//                         for( let val of tide ) {
-//                             vals.push(val*100/totals[i]);
-//                         }
-//                     }
-//                     y_max = Math.max(...vals);
-//                 } else {
-//                     y_max = 0;
-//                 }
-//
-// 			} else {
-//                 let totals = safe_data.map( low_tide =>Math.max(sum( Object.keys(low_tide['crabs']).filter( crab => crabs.includes(crab) ).map( crab =>low_tide['crabs'][crab][0] )),1) );
-//
-//                 y_max = Math.max(...Object.entries(safe_data).map( ( [ i,low_tide ] ) => Object.keys(low_tide['crabs']).filter( crab => crabs.includes(crab) ).map( crab =>low_tide['crabs'][crab][0]*100/totals[i] ) ).flat());
-//
-//             }
-		} else if( visualization_type === 'Presence-absence' ) {
-            if( ["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type) ) {
-                let lii = data.map( low_tide => Object.keys(low_tide['crabs']).filter( crab => crabs.includes(crab) ).map( crab =>+(!!(low_tide['crabs'][crab][2])) ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    let vals = [];
-                    for( let j of li ) {
-                        vals.push([]);
-                        for( let i of range(j.length) ) {
-                            let l = Math.max(0,i-13);
-                            let h = Math.min(i+14,j.length);
-                            let m = get_date_num(data[i]['date']);
-                            let div = Math.max(sum( range(h-l).map( n =>factor**Math.abs(get_date_num(data[l+n]['date'])-m) )),0);
-                            vals.at(-1).push(sum( j.slice(l,h).entries().map( ( [ n,x ] ) =>presence_absence(x,x,true)*(factor**Math.abs(get_date_num(data[l+n]['date'])-m)) ))/div);
-                        }
-                    }
-                    if( graph_type === 'Stacked' ) {
-                        y_max = Math.max(...range(vals[0].length).map( i =>sum( range(vals.length).map( j =>vals[j][i] )) ));
-                    } else {
-                        y_max = Math.max(...vals.map( val =>Math.max(...val) ));
-                    }
-                } else {
-                    y_max = 0;
-                }
-            } else if( graph_type === 'Stacked' ) {
-                y_max = Math.max(...safe_data.map( low_tide =>sum( Object.keys(low_tide['crabs']).filter( crab => crabs.includes(crab) ).map( crab =>presence_absence(low_tide['crabs'][crab][0],low_tide['crabs'][crab][2],true) )) ));
-			} else {
-                y_max = 1;
-            }
-
-		} else {
-            if( ["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type) ) {
-                let lii = data.map( low_tide => Object.keys(low_tide['crabs']).filter( crab => crabs.includes(crab) ).map( crab =>low_tide['crabs'][crab][0] ) );
-                let li = [];
-                for( let i of range(lii[0].length) ) {
-                    li.push( lii.map( x =>x[i] ));
-                }
-                if( li.length ) {
-                    let vals = [];
-                    for( let j of li ) {
-                        vals.push([]);
-                        for( let i of range(j.length) ) {
-                            let l = Math.max(0,i-13);
-                            let h = Math.min(i+14,j.length);
-                            let m = get_date_num(data[i]['date']);
-                            let div = Math.max(sum( range(h-l).map( n =>factor**Math.abs(get_date_num(data[l+n]['date'])-m) )),0);
-                            vals.at(-1).push(sum( j.slice(l,h).entries().map( ( [ n,x ] ) =>x*(factor**Math.abs(get_date_num(data[l+n]['date'])-m)) ))/div);
-                        }
-                    }
-                    if( graph_type === 'Stacked' ) {
-                        y_max = Math.max(...range(vals[0].length).map( i =>sum( range(vals.length).map( j =>vals[j][i] )) ));
-                    } else {
-                        y_max = Math.max(...vals.map( val =>Math.max(...val) ));
-                    }
-                } else {
-                    y_max = 0;
-                }
-            } else if( graph_type === 'Stacked' ) {
-                y_max = Math.max(...safe_data.map( low_tide =>sum( Object.keys(low_tide['crabs']).filter( crab => crabs.includes(crab) ).map( crab =>low_tide['crabs'][crab][0] )) ));
-			} else {
-                y_max = Math.max(...safe_data.map( low_tide => Object.keys(low_tide['crabs']).filter( crab => crabs.includes(crab) ).map( crab =>low_tide['crabs'][crab][0] ) ).flat());
-
-            }
-        }
-        let t_max = Math.max(...safe_data.map( low_tide =>low_tide['temp'] ));
-
-        let t_min = Math.min(...safe_data.map( low_tide =>low_tide['temp'] ));
-        if( y_max < 1 ) {
-            y_max = 1;
-        }
-        if( orginization_type === 'Seasonal' ) {
-            x_max = 365;
         } else if( orginization_type === 'Locational' ) {
-            x_max = locations.length-1;
-}
-
-        y_min += (y_max-y_min)*max_s;
-        y_max *= max_e;
-        if( y_max-y_min === 0 ) {
+            for( let [ i,low_tide ] of data.entries() ) {
+                low_tide['date'] = locations.indexOf(low_tide['location']);
+            }
+        }
+	}
+	
+	run_viz(data,visualization_type,crabs){
+        let lii = data.map( low_tide => Object.entries(crabs).map( ( [ i,crab ] ) =>low_tide['crabs'][crab][0] ) );
+        let li = [];
+        for( let i of range(lii[0].length) ) {
+            li.push( lii.map( x =>x[i] ));
+        }
+        if( !li.length ) {
+			console.log('no species')
             return;
         }
-        y_max,y_min = this.draw_y_scalebar(y_max,visualization_type,y_min);
-//         t_max,t_min = this.draw_t_scalebar(t_max,visualization_type,t_min);
-        let do_svg = false;
-        this.draw_graph(data,x_max,y_min,y_max,t_min,t_max,days,crabs,visualization_type,smoothing_type,
-                         graph_type,orginization_type,locations,avgs,factor,temp);
-        this.draw_x_scalebar(days,graph_type,orginization_type,locations);
-    }
+		if ( ['Relative to average','Percent relative to average','Percent of the way to average'].includes(visualization_type) ) {
+			var avgs = range(crabs.length).map( i => Math.max(sum(li[i])/li[i].length,0.000001));
+		}
+		if (['Percent of the way to maximum'].includes(visualization_type)){
+			var maxes = range(crabs.length).map( i => Math.max(...li[i],1));
+		}
+		if (['Percent of selected'].includes(visualization_type)){
+			var selected_totals = range(li[0].length).map( i => sum(li.map( l => l[i] )));
+		}
+		if ( visualization_type === 'Numbers' ) {
+			
+		} else if( visualization_type === 'Percent' ) {
+	        for ( let i of range(li.length) ) {
+		        for ( let j of range(data.length) ) {
+					if (data[j]['totall']){
+						li[i][j] *= 100/data[j]['totall']
+					}
+		        }
+	        }
+	        
+        } else if( visualization_type === 'Relative to average' ) {
+	        for ( let i of range(li.length) ) {
+		        for ( let j of range(data.length) ) {
+		        	li[i][j] -= avgs[i]
+		        }
+	        }
+		} else if( visualization_type === 'Percent relative to average' ) {
+	        for ( let i of range(li.length) ) {
+		        for ( let j of range(data.length) ) {
+		        	li[i][j] = (li[i][j]/avgs[i]-1)*100
+		        }
+	        }
+		} else if( visualization_type === 'Percent of the way to average' ) {
+	        for ( let i of range(li.length) ) {
+		        for ( let j of range(data.length) ) {
+		        	li[i][j] = (li[i][j]/avgs[i])*100
+		        }
+	        }
+		} else if( visualization_type === 'Percent of the way to maximum' ) {
+	        for ( let i of range(li.length) ) {
+		        for ( let j of range(data.length) ) {
+		        	li[i][j] = (li[i][j]/maxes[i])*100
+		        }
+	        }
+		} else if( visualization_type === 'Percent of selected' ) {
+	        for ( let i of range(li.length) ) {
+		        for ( let j of range(data.length) ) {
+					if (selected_totals[j]){
+						li[i][j] = (li[i][j]/selected_totals[j])*100
+					}
+		        }
+	        }
+		} else if( visualization_type === 'Presence-absence' ) {
+	        for ( let i of range(li.length) ) {
+		        for ( let j of range(data.length) ) {
+		        	li[i][j] = presence_absence(0,data[j]['crabs'][crabs[i]][2],true)
+		        }
+	        }
+		}
+		return li
+	}
+	
+	smooth(li,data,k,r){
+		console.log(sum(li[0]))
+		function falloff(d,k){
+			return (k/(k+1))**d
+		}
+		let lock = 0
+		let li_save = structuredClone(li)
+		for (let i = 0; i < li_save.length; i++){
+			for (let j = 0; j < li_save[i].length; j++){
+				li[i][j] *= lock
+			}
+		}
+		for (let i = 0; i < li_save.length; i++){
+			for (let j = 0; j < li_save[i].length; j++){
+				let s = -Math.min(r,j)
+				let e = Math.min(r,li_save[i].length-j-1)
+				let mult = 0
+				for (let d = s; d <= e; d++){
+					mult += falloff(Math.abs(data[j]['date']-data[j+d]['date']),k)
+				}
+				for (let d = s; d <= e; d++){
+					//li[i][j+d] += li_save[i][j]*(1-lock)*falloff(Math.abs(data[j]['date']-data[j+d]['date']),k)/mult
+					
+					li[i][j] += li_save[i][j+d]*(1-lock)*falloff(Math.abs(data[j]['date']-data[j+d]['date']),k)/mult
+				}
+			}
+		}
+		console.log(sum(li[0]))
+		
+	}
+	bin(li,data,d){
+		console.log(data)
+		let data_n = []
+		let li_n = []
+		for (let i = 0; i < li.length; i++){
+			li_n.push([])
+			let bin_num = ~~(data[0]['date']/d);
+			let bin_end = (bin_num+1)*d
+			li_n[i].push([0,0])
+			for (let j = 0; j < li[i].length; j++){
+				if (data[j]['date'] >= bin_end){
+					if (!i){
+						data_n.push(structuredClone(data[j]))
+						data_n.at(-1)['date'] = Math.round((bin_num+0.5)*d)
+						data_n.at(-1)['dateTXT'] = get_date(Math.floor((bin_num)*d)) + '-' + get_date(Math.floor((bin_num+1)*d))
+						data_n.at(-1)['location'] = `${li_n[i].at(-1)[1]} surveys`
+					}
+					li_n[i][li_n[i].length-1] = li_n[i].at(-1)[0]/li_n[i].at(-1)[1]
+					bin_num = ~~(data[j]['date']/d);
+					bin_end = (bin_num+1)*d
+					li_n[i].push([0,0])
+				}
+				li_n[i][li_n[i].length-1][0] += li[i][j]
+				li_n[i][li_n[i].length-1][1] += 1
+			}
+			if (!i){
+				data_n.push(structuredClone(data.at(-1)))
+				data_n.at(-1)['date'] = Math.round((bin_num+0.5)*d)
+				data_n.at(-1)['dateTXT'] = get_date(Math.floor((bin_num)*d)) + '-' + get_date(Math.floor((bin_num+1)*d))
+				data_n.at(-1)['location'] = `${li_n[i].at(-1)[1]} surveys`
+			}
+			li_n[i][li_n[i].length-1] = li_n[i].at(-1)[0]/li_n[i].at(-1)[1]
+		}
+		console.log(structuredClone(data_n))
+		console.log(structuredClone(li_n))
+		return [li_n,data_n]
+	}
+	
+	do_graph_changes(li,graph_type){
+		if (graph_type == 'Stacked'){
+			for (let i = 1; i < li.length; i++){
+				for (let j = 0; j < li[i].length; j++){
+					li[i][j] += li[i-1][j]
+				}
+			}
+		}
+		
+	}
 
-    draw_graph(data,x_max,y_min,y_max,t_min,t_max,days,crabs,visualization_type,smoothing_type,graph_type,orginization_type,locations,avgs,factor,temp) {
-        this.master.update_point_count(data.length);
+    draw_graph(data,li,x_max,max_s,max_e,days,crabs,visualization_type,smoothing_type,graph_type,orginization_type,locations,options,d) {
+		console.log(data)
+		this.master.update_point_count(data.length);
+		let li_save = structuredClone(li)
+		this.do_graph_changes(li,graph_type)
+        let t_max = Math.max(...data.map( low_tide =>low_tide['temp'] ));
+        let t_min = Math.min(...data.map( low_tide =>low_tide['temp'] ));
+		
+        let y_max = Math.max(...li.map( sub => Math.max(...sub) ));
+		let y_min = 0
+		if (visualization_type == 'Percent of selected'){
+			y_max = 100
+		}
+		if (['Relative to average','Percent relative to average'].includes(visualization_type)){
+			y_min = -y_max
+		}
+        y_min += (y_max-y_min)*max_s;
+        y_max *= max_e;
+        if( y_max-y_min <= 0 ) {
+            return;
+        }
+		y_max,y_min = this.draw_y_scalebar(y_max,visualization_type,y_min);
         let x_scale = this.x_size/x_max;
-		let multiply
-        if( visualization_type === 'Percent' ) {
-            multiply = 1;
-        } else if( visualization_type === 'Percent relative to average' ) {
-            multiply = 2;
-		} else if( ['Percent of the way to average','Percent of the way to maximum'].includes(visualization_type) ) {
-            multiply = 3;
-		} else {
-            multiply = 0;
-        }
-        if( y_max === y_min ) {
-            y_min -= y_max/100;
-        }
         let y_scale = this.y_size/(y_max-y_min);
         let t_scale = this.y_size/(t_max-t_min);
-
-        this.data_coords = [];
-        let data_coords = [];
-        let coord_dict = {};
-        let location_totals = {};
+		
 		let min_mul
-        if( orginization_type === 'Seasonal' ) {
+        if ( ['Seasonal','Locational'].includes(orginization_type) ) {
             min_mul = 0;
         } else {
             min_mul = 1;
         }
-		let do_presence_absence
-        if( visualization_type === 'Presence-absence' ) {
-            do_presence_absence = true;
-        } else {
-            do_presence_absence = false;
-        }
-        var prev_coords = range(data.length).map( i =>0 );
-        let prev_true_coords = range(data.length).map( i => y_max*y_scale+40 );
-        let tides = data.map( i => ({}) );
-        //print(data.length)
-        let dot_size=5;
-        let count = 0;
-		let multi = 0
-		let sub = 0
-        for( let [ crab_index,crab ] of crabs.entries() ) {
-            let coords_rec = [];
-            let true_coords_rec = [];
-            let coords = [];
-            if( multiply === 1 ) {
-                sub = 0;
-                if (data[0]['totall']) {
-                    multi = 100/data[0]['totall'];
-                } else {
-                    multi = 1;
-                }
-            } else if( multiply === 2 ) {
-                if (avgs[crab_index]) {
-                    multi = 100/avgs[crab_index];
-                } else {
-                    multi = 1;
-                }
-                sub = 100/multi;
-			} else {
-                sub = avgs[crab_index];
-                multi = 1;
-            }
-            var coords_list = [];
-            var coords_list_record = [];
-            for( let [ i,low_tide ] of data.entries() ) {
-                if( multiply === 1 ) {
-                    sub = 0;
-                    if (low_tide['totall']) {
-                        multi = 100/low_tide['totall'];
-                    } else {
-                        multi = 1;
-                    }
-
-                } else if( multiply === 2 ) {
-                    if (avgs[crab_index]) {
-                        multi = 100/avgs[crab_index];
-                    } else {
-                        multi = 1;
-                    }
-                    sub = 100/multi;
-				} else if( multiply === 3 ) {
-                    if (avgs[crab_index]) {
-                        multi = 100/avgs[crab_index];
-                    } else {
-                        multi = 1;
-                    }
-                    sub = 0;
+        this.data_coords = [];
+        let data_coords = [];
+		let dot_size = 5
+		if (orginization_type === 'Locational'){
+			dot_size = 3
+		}
+		let li_new = []
+		console.log(data)
+		for (let i = 0; i < li.length; i++){
+			let save = []
+			li_new.push([])
+			for (let j = 0; j < li[i].length; j++){
+				if (d && graph_type !== 'Scatter-plot'){
+					li_new[i].push([(Math.max(get_date_num(data[j]['date'])-Math.min(...days)*min_mul-d/2,0))*x_scale+this.padding+10,
+							(y_max-li[i][j])*y_scale+40,dot_size,(t_max-data[j]['temp'])*t_scale+40,1])
+					li_new[i].push([(Math.min(get_date_num(data[j]['date'])-Math.min(...days)*min_mul+d/2,x_max))*x_scale+this.padding+10,
+							(y_max-li[i][j])*y_scale+40,dot_size,(t_max-data[j]['temp'])*t_scale+40,1])
 				} else {
-                    sub = avgs[crab_index];
-                    multi = 1;
-                }
-
-                if( visualization_type === 'Percent of selected' ) {
-                    coords_list.push([(get_date_num(low_tide['date'])-Math.min(...days)*min_mul)*x_scale+this.padding+10,
-                              low_tide['crabs'][crab][0],dot_size]);
-                } else if( orginization_type === 'Locational' ) {
-                    coords = [(locations.indexOf(low_tide['location']))*x_scale+this.padding+10,
-                              ((presence_absence(low_tide['crabs'][crab][0],low_tide['crabs'][crab][2],do_presence_absence)-sub)*multi*(-1)+y_max)*y_scale+40,3];
-                    if( arrayIncludes(coords_list_record,coords.slice( 0,2 )) ) {
-                        let ind = arrayIndex(coords_list_record,coords.slice( 0,2 ));
-                        if( coords_list[ind][2] < 8 ) {
-                            coords_list[ind][2] += 0.5;
-                        }
-                    } else {
-                        coords_list.push(coords);
-                        coords_list_record.push(coords.slice( 0,2 ));
-                    }
-
-				} else if( graph_type === 'Stacked' ) {
-                    coords_list.push([(get_date_num(low_tide['date'])-Math.min(...days)*min_mul)*x_scale+this.padding+10,
-                              ((presence_absence(low_tide['crabs'][crab][0],low_tide['crabs'][crab][2],do_presence_absence)*multi+prev_coords[i])*(-1)+y_max)*y_scale+40,dot_size]);
-                    coords_rec.push(presence_absence(low_tide['crabs'][crab][0],low_tide['crabs'][crab][2],do_presence_absence)*multi);
+					li_new[i].push([(get_date_num(data[j]['date'])-Math.min(...days)*min_mul)*x_scale+this.padding+10,
+							(y_max-li[i][j])*y_scale+40,dot_size,(t_max-data[j]['temp'])*t_scale+40,1])
+				}
+				
+				if (orginization_type === 'Locational'){
+					if (arrayIncludes(save,li_new[i][j].slice( 0,2 ))){
+						li_new[i][j][2] = Math.min(li_new[i][arrayLastIndex(save,li_new[i][j].slice( 0,2 ))][2]+0.5,8)
+						li_new[i][j][4] = li_new[i][arrayLastIndex(save,li_new[i][j].slice( 0,2 ))][4]+1
+					}
+					save.push(li_new[i][j].slice( 0,2 ))
+					data_coords.push([li_new[i][j],crabs[i],data[j]['location'],li_new[i][j][4],data[j]['crabs'][crabs[i]][1],data[j]['crabs'][crabs[i]][2],0]);
 				} else {
-                    if( low_tide['crabs'][crab][0] ) {
-                        count += 1;
-                    }
-					//console.log(get_date_num(low_tide['date']))
-                    coords_list.push([(get_date_num(low_tide['date'])-Math.min(...days)*min_mul)*x_scale+this.padding+10,
-                              ((presence_absence(low_tide['crabs'][crab][0],low_tide['crabs'][crab][2],do_presence_absence)-sub)*multi*(-1)+y_max)*y_scale+40,dot_size]);
+					if (d){
+						let p = 2
+						if (graph_type !== 'Scatter-plot'){
+							data_coords.push([li_new[i][j*2],crabs[i],data[j]['location'],data[j]['dateTXT'],'',`avg ${li_save[i][j].toFixed(p)}`,li_new[i][j*2+1][0]-li_new[i][j*2][0]]);
+						} else {
+							data_coords.push([li_new[i][j],crabs[i],data[j]['location'],data[j]['dateTXT'],'',`avg ${li_save[i][j].toFixed(p)}`,0]);
+						}
+						
+					} else {
+						data_coords.push([li_new[i][j],crabs[i],data[j]['location'],data[j]['dateTXT'],data[j]['crabs'][crabs[i]][1],data[j]['crabs'][crabs[i]][2],0]);
+					}
+					
+				}
+				
+			}
+		}
+		let data_coords_t = structuredClone(data_coords)
+		console.log(li_new)
+		for (let i = 0; i < li_new.length; i++){
+			let crab = crabs[i]
+			if ( graph_type === 'Scatter-plot' ) {
+				if (options.includes("shapes")){
+					this.draw.path(location_data[data[0]['location']]['shape']).attr({
+					            'fill':this.crab_colors[crab],
+					            'shape-rendering':'crispEdges',
+					            'stroke-width': 0
+					        }).scale(li_new[i][0][2],0,0).translate(li_new[i][0][0],li_new[i][0][1]); //
+				} else {
+					this.draw_point(li_new[i][0].slice( 0,2 ),this.crab_colors[crab],li_new[i][0][2]); //
+				}
+                if( options.includes("temp") ) {
+                    this.draw_point([li_new[i][0][0],li_new[i][0][3]],'#ff0000',li_new[i][0][2]/2);
                 }
-                if( !["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type) ) {
-                    data_coords.push([coords_list.at(-1),crab,low_tide['location'],low_tide['dateTXT'],low_tide['crabs'][crab][1],low_tide['crabs'][crab][2]]);
-                    true_coords_rec.push(coords_list.at(-1)[1]);
-                }
-                coords_list.at(-1).push((t_max-low_tide['temp'])*t_scale+40);
-            }
-			var curent_coords
-            if( ["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type) ) {
-                let div = Math.max(sum( coords_list.slice( 0,14 ).entries().map( ( [ n,x ] ) =>factor**(x[0]/x_scale-coords_list[0][0]/x_scale) )),0);
-                curent_coords = [coords_list[0][0],sum( coords_list.slice( 0,14 ).entries().map( ( [ n,x ] ) =>x[1]*factor**(x[0]/x_scale-coords_list[0][0]/x_scale) ))/div,dot_size,coords_list[0][3]];
-                data_coords.push([curent_coords,crab,data[0]['location'],data[0]['dateTXT'],data[0]['crabs'][crab][1],data[0]['crabs'][crab][2]]);
-                true_coords_rec.push(curent_coords[1]);
-            } else {
-                curent_coords = coords_list[0];
-            }
-            var new_coords = []
-            for( let [ i,coords ] of coords_list.slice(1 ).entries() ) {
-                let xxx = i;
-                if( ["Smoothed low","Smoothed medium","Smoothed high"].includes(smoothing_type) ) {
-                    let l = Math.max(0,i-12);
-                    let h = Math.min(i+15,coords_list.length);
-                    let m = coords[0];
-                    let div = Math.max(sum( coords_list.slice( l,h ).entries().map( ( [ n,x ] ) =>factor**Math.abs(x[0]/x_scale-m/x_scale) )),0);
-                    new_coords = [coords[0],sum( coords_list.slice( l,h ).entries().map( ( [ n,x ] ) =>x[1]*factor**Math.abs(x[0]/x_scale-m/x_scale) ))/div,dot_size,coords[3]];
-                    data_coords.push([new_coords,crab,data[i+1]['location'],data[i+1]['dateTXT'],data[i+1]['crabs'][crab][1],data[i+1]['crabs'][crab][2]]);
-                    true_coords_rec.push(new_coords[1]);
-                } else {
-                    new_coords = coords;
-                }
-                if( visualization_type === 'Percent of selected' ) {
-                    tides[xxx][crab] = curent_coords;
-                } else if( graph_type === 'Line-graph' ) {
-                    if( temp ) {
-                        this.draw.line(curent_coords[0],curent_coords[3],new_coords[0],new_coords[3]).stroke({color: '#ff0000',width: 1 });
-                    }
-                    this.draw.line(...curent_coords.slice( 0,2 ),...new_coords.slice( 0,2 )).stroke({color: this.crab_colors[crab],width: 2 });
+			}
+			for (let j = 1; j < li_new[i].length; j++){
+				if ( graph_type === 'Line-graph') {
+					if (!d || j%2){
+		                if ( options.includes("temp") ) {
+		                    this.draw.line(li_new[i][j-1][0],li_new[i][j-1][3],li_new[i][j][0],li_new[i][j][3]).stroke({color: '#ff0000',width: 1 });
+		                }
+		                this.draw.line(...li_new[i][j-1].slice( 0,2 ),...li_new[i][j].slice( 0,2 )).stroke({color: this.crab_colors[crab],width: 2 });
+					}
+	                
 				} else if( graph_type === 'Stacked' ) {
-                    let poly = this.draw.polygon(`${curent_coords[0]},${curent_coords[1]} ${new_coords[0]},${new_coords[1]} ${new_coords[0]},${prev_true_coords[i+1]} ${curent_coords[0]},${prev_true_coords[i]}`).attr({
-				            'fill':this.crab_colors[crab],
-				            'shape-rendering':'crispEdges',
-				            'stroke-width': 0
-				        });
-					poly.on('mouseover', (event) => {
-						this.master.display('',crab,'','','')
-					})
-					poly.on('mouseout', (event) => {
-						this.master.display('','','','','') 
-					})
-                    if( temp ) {
-                        this.draw.line(curent_coords[0],curent_coords[3],new_coords[0],new_coords[3]).stroke({color: '#ff0000',width: 1 });
-                    }
-				} else if( graph_type === 'Scatter-plot' ) {
-                    this.draw_point(curent_coords.slice( 0,2 ),this.crab_colors[crab],curent_coords[2]);
-                    if( temp ) {
-                        this.draw_point([curent_coords[0],curent_coords[3]],'#ff0000',curent_coords[2]/2);
-                    }
-				}
-                curent_coords = new_coords;
-            }
-            
-            if( visualization_type === 'Percent of selected' ) {
-                tides.at(-1)[crab] = curent_coords;
-            } else if( graph_type === 'Scatter-plot' ) {
-                this.draw_point(curent_coords.slice( 0,2 ),this.crab_colors[crab],curent_coords[2]);
-                if( temp ) {
-                    this.draw_point([curent_coords[0],curent_coords[3]],'#ff0000',curent_coords[2]/2);
-				}
-            }
-            for( let [ i,val ] of coords_rec.entries() ) {
-                prev_coords[i] += val;
-            }
-            prev_true_coords = true_coords_rec.slice();
-        }
-
-        if( visualization_type === 'Percent of selected' ) {
-            data_coords = [];
-            let totals = [];
-            for( let tide of tides ) {
-                let total = 0;
-                for( let point of Object.values(tide) ) {
-                    total += point[1];
-                }
-                if( total === 0 ) {
-                    total = 1;
-                }
-                totals.push(total);
-            }
-            prev_coords = range(data.length).map( i =>0 );
-            prev_true_coords = range(data.length).map( i =>650 );
-            for( let [ crab_index,crab ] of crabs.entries() ) {
-                let coords_rec = [];
-                let true_coords_rec = [];
-                let coords = [];
-                let coords_list_record = [];
-                let curent_coords = [tides[0][crab][0],(((tides[0][crab][1]+prev_coords[0])*100/totals[0])*(-1)+y_max)*y_scale+40,tides[0][crab][2],tides[0][crab][3]];
-                coords_rec.push(tides[0][crab][1]);
-                true_coords_rec.push(curent_coords[1]);
-                data_coords.push([curent_coords,crab,data[0]['location'],data[0]['dateTXT'],data[0]['crabs'][1],data[0]['crabs'][2]]);
-                for( let [ i,coords ] of tides.slice(1 ).entries() ) {
-                    let new_coords = [coords[crab][0],(((coords[crab][1]+prev_coords[i+1])*100/totals[i+1])*(-1)+y_max)*y_scale+40,coords[crab][2],coords[crab][3]];
-                    coords_rec.push(coords[crab][1]);
-                    true_coords_rec.push(new_coords[1]);
-                    data_coords.push([new_coords,crab,data[i+1]['location'],data[i+1]['dateTXT'],data[i+1]['crabs'][crab][1],data[i+1]['crabs'][crab][2]]);
-                    if( graph_type === 'Line-graph' ) {
-                        if( temp ) {
-                            this.draw.line(curent_coords[0],curent_coords[3],new_coords[0],new_coords[3]).stroke({color: '#ff0000',width: 1 });
-                        }
-                        this.draw.line(...curent_coords.slice( 0,2 ),...new_coords.slice( 0,2 )).stroke({color: this.crab_colors[crab],width: 2 });
-                    } else if( graph_type === 'Stacked' ) {
-	                    let poly = this.draw.polygon(`${curent_coords[0]},${curent_coords[1]} ${new_coords[0]},${new_coords[1]} ${new_coords[0]},${prev_true_coords[i+1]} ${curent_coords[0]},${prev_true_coords[i]}`).attr({
+					if (!d || j%2){
+						if (i === 0){
+							var prev = [y_max*y_scale+40,y_max*y_scale+40]
+						}
+						else {
+							var prev = [li_new[i-1][j-1][1],li_new[i-1][j][1]]
+						}
+						let gaps = 0.1
+		                let poly = this.draw.polygon(`${li_new[i][j-1][0]+gaps/2},${li_new[i][j-1][1]} ${li_new[i][j][0]-gaps/2},${li_new[i][j][1]} ${li_new[i][j][0]-gaps/2},${prev[1]} ${li_new[i][j-1][0]+gaps/2},${prev[0]}`).attr({
 					            'fill':this.crab_colors[crab],
 					            'shape-rendering':'crispEdges',
 					            'stroke-width': 0
 					        });
-						poly.on('mouseover', (event) => {
-							this.master.display('',crab,'','','')
-						})
+						if (d){
+							poly.on('mouseover', (event) => {
+								this.master.display(data_coords[(j-1)/2+i*li[i].length][5],data_coords[(j-1)/2+i*li[i].length][1]+': ',
+		                    			data_coords[(j-1)/2+i*li[i].length][2],data_coords[(j-1)/2+i*li[i].length][3],data_coords[(j-1)/2+i*li[i].length][4]);
+							})
+						} else {
+							poly.on('mouseover', (event) => {
+								this.master.display('',crab,'','','')
+							})
+						}
+						
 						poly.on('mouseout', (event) => {
 							this.master.display('','','','','') 
 						})
-	                    if( temp ) {
-	                        this.draw.line(curent_coords[0],curent_coords[3],new_coords[0],new_coords[3]).stroke({color: '#ff0000',width: 1 });
-	                    }
+		                if( options.includes("temp") ) {
+		                    this.draw.line(li_new[i][j-1][0],li_new[i][j-1][3],li_new[i][j][0],li_new[i][j][3]).stroke({color: '#ff0000',width: 1 });
+		                }
+					} else if (li_new[i][j][0]-li_new[i][j-1][0] > 1) {
+		                let poly = this.draw.polygon(`${li_new[i][j-1][0]},0 ${li_new[i][j][0]},0 ${li_new[i][j][0]},${this.y_size+40} ${li_new[i][j-1][0]},${this.y_size+40}`).attr({
+					            'fill':'#dddddd',
+								'fill-opacity': 0.04,
+					            'shape-rendering':'crispEdges',
+					            'stroke-width': 0
+					        });
+						poly.on('mouseover', (event) => {
+							this.master.display('','No data','','','')
+						})
+						
+						poly.on('mouseout', (event) => {
+							this.master.display('','','','','') 
+						})
 					}
- 				   else if( graph_type === 'Scatter-plot' ) {
-                        this.draw_point(curent_coords.slice( 0,2 ),this.crab_colors[crab],curent_coords[2]);
-                        if( temp ) {
-                            this.draw_point([curent_coords[0],curent_coords[3]],'#ff0000',curent_coords[2]/2);
-                        }
+				} else if( graph_type === 'Scatter-plot' ) {
+					if (options.includes("shapes")){
+						this.draw.path(location_data[data[j]['location']]['shape']).attr({
+						            'fill':this.crab_colors[crab],
+						            'shape-rendering':'crispEdges',
+						            'stroke-width': 0
+						        }).scale(li_new[i][j][2],0,0).translate(li_new[i][j][0],li_new[i][j][1]); //
+					} else {
+						this.draw_point(li_new[i][j].slice( 0,2 ),this.crab_colors[crab],li_new[i][j][2]); //
 					}
-                    curent_coords = new_coords;
-                }
+	                if( options.includes("temp") ) {
+	                    this.draw_point([li_new[i][j][0],li_new[i][j][3]],'#ff0000',li_new[i][j][2]/2);
+	                }
+				}
+			}
+		}
+		data_coords_t.reverse()
+ 		this.data_coords = [data_coords_t,{'y_max':y_max,'y_scale':y_scale,'orginization_type':orginization_type,'d':d}];
 
-                if( graph_type === 'scatter-plot' ) {
-                    this.draw_point(curent_coords.slice( 0,2 ),this.crab_colors[crab],curent_coords[2]);
-                    if( temp ) {
-                        this.draw_point([curent_coords[0],curent_coords[3]],'#ff0000',curent_coords[2]/2);
-                    }
-                } // else if( graph_type === 'line-graph' ) {
- //                    this.create_text(curent_coords.slice( 0,2 ), {fill: this.crab_colors[crab],
- //                                 text: crab });
- // 				}
-                if( graph_type === 'Stacked' ) {
-                    for( let [ i,val ] of coords_rec.entries() ) {
-                        prev_coords[i] += val;
-                    }
-                    prev_true_coords = true_coords_rec;
-                }
-            }
-        }
-		this.data_coords = [data_coords,{'multi':multi,'y_max':y_max,'y_scale':y_scale}];
-
+    }
+    download_MDS(data,li,crabs) {
+		let MDS_data = []
+		console.log(location_data)
+		for (let i = 0; i < data.length; i++){
+			MDS_data.push([[],'#' + location_data[data[i]['location']]['color']])
+			for (let j = 0; j < crabs.length; j++){
+				MDS_data[i][0].push(li[j][i])
+			}
+		}
+		var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(MDS_data));
+		var dlAnchorElem = document.getElementById('downloadAnchorElem');
+		dlAnchorElem.setAttribute("href",     dataStr     );
+		dlAnchorElem.setAttribute("download", "MDS.json");
+		dlAnchorElem.click();
     }
     // generate_svg(data,x_max,y_min,y_max,t_min,t_max,days,crabs,visualization_type,smoothing_type,graph_type,orginization_type,locations,avgs,factor,temp) {
 //         let x_scale = 1560/x_max;
@@ -1743,7 +1496,6 @@ class CrabVisualizationFrame {
 //     }
 
     handle_motion(x,y) {
-
         if( this.graph_type === 'Stacked' ) {
             return;
         }
@@ -1761,21 +1513,40 @@ class CrabVisualizationFrame {
         let trans_dict = this.data_coords[1];
         let min_dist = [30000,30000];
         let m = 0;
+	
         for( let [ i,data_coord ] of this.data_coords[0].entries() ) {
-            if( Math.abs(x - data_coord[0][0]+10)+Math.abs(y - data_coord[0][1]-10)
-               < min_dist[0]+min_dist[1] ) {
-                min_dist = [Math.abs(x - data_coord[0][0]+10),
-                            Math.abs(y - data_coord[0][1]-10),data_coord];
-                m = i;
-            }
+			if (trans_dict['d']){
+	            if( (Math.abs(x - data_coord[0][0]+10)+Math.abs(x - (data_coord[0][0]+data_coord[6]) + 10)-data_coord[6])/2+Math.abs(y - data_coord[0][1]-10)
+	               < min_dist[0]+min_dist[1] ) {
+	                min_dist = [(Math.abs(x - data_coord[0][0]+10)+Math.abs(x - (data_coord[0][0]+data_coord[6]) + 10)-data_coord[6])/2,
+	                            Math.abs(y - data_coord[0][1]-10),data_coord];
+	                m = i;
+	            }
+			} else {
+	            if( Math.abs(x - data_coord[0][0]+10)+Math.abs(y - data_coord[0][1]-10)
+	               < min_dist[0]+min_dist[1] ) {
+	                min_dist = [Math.abs(x - data_coord[0][0]+10),
+	                            Math.abs(y - data_coord[0][1]-10),data_coord];
+	                m = i;
+	            }
+			}
+            
         }
-		
-        if( min_dist[0] + min_dist[1] < 12 ) {
+		let r = 12
+		if (trans_dict['d'] && this.graph_type !== 'Scatter-plot'){
+			r = 6
+		}
+        if( min_dist[0] + min_dist[1] < r ) {
             /*self.master.display(round(((min_dist[2][0][1]-40)/trans_dict['y_scale']\
                                 -trans_dict['y_max'])*(-1)*10)/10,min_dist[2][1]+': ',
                                 self.data_coords[0][m][2],self.data_coords[0][m][3],self.data_coords[0][m][4])*/
-            this.master.display(this.data_coords[0][m][5],min_dist[2][1]+': ',
-                                this.data_coords[0][m][2],this.data_coords[0][m][3],this.data_coords[0][m][4]);
+			if (this.data_coords[1]['orginization_type'] === 'Locational'){
+				this.master.display(`${this.data_coords[0][m][5]} x${this.data_coords[0][m][3]}`,min_dist[2][1]+': ',
+                    	`${this.data_coords[0][m][2]}`,'','');
+			} else {
+				this.master.display(this.data_coords[0][m][5],min_dist[2][1]+': ',
+                    	this.data_coords[0][m][2],this.data_coords[0][m][3],this.data_coords[0][m][4]);
+			}
         } else {
             if( this.graph_type !== 'Stacked' ) {
                 this.master.display('','','','','');
