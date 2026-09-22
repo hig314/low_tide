@@ -38,6 +38,19 @@ handoff.) Handoff history:
   refresh.sh now publishes 5 blobs, deploy rsync excludes 6, cron fixed to true
   4 AM Anchorage.
 
+## Change log (deploy-layer sessions, newest first)
+
+- **2026-09-21 — domain.** Put the site on **https://lowtidedata.org** (commit
+  `e054709`). Registered at Cloudflare; DNS-only A records `@`+`www` → 209.38.5.101;
+  added two Caddy site blocks on the droplet (apex → `lowtide:80`, `www` → 301 to
+  apex) and hot-reloaded; Let's Encrypt cert issued immediately (expires 2026-12-20,
+  auto-renews). Backup of the prior Caddyfile: `/opt/caddy/Caddyfile.bak-20260921`.
+  No app files, nginx config, compose, cron or data touched. Bare-IP URL kept as a
+  fallback. Docs updated: `deploy/Caddyfile`, `deploy/README.md`, `deploy/opt-README.md`
+  (+ droplet `/opt/README.md`), this file.
+- **2026-09-04 — first git handoff** (commit `702fe02`): location blobs in refresh,
+  6 rsync excludes, true-4AM-Anchorage cron. See "Handoffs" above.
+
 ## Current status: DEPLOYED & LIVE ✅
 
 - **low_tide:** **https://lowtidedata.org/** (since 2026-09-21; `www.` 301s to the apex; HTTPS via

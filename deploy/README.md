@@ -15,10 +15,21 @@ copy of HWITW's server — its `/wxapp/*` routes need a `wxdata` module that isn
 present here, and its `/` redirect points at a nonexistent `index.html`. So we
 serve the static files directly with nginx; no Python runtime, no source edits.
 
-## How it's reached — its own "naked IP"
+## How it's reached — domain + its own "naked IP"
 
-A DigitalOcean **Reserved IP, `209.38.5.101`**, is attached to the droplet, giving
-low_tide its own bare URL (no port, no domain):
+Since 2026-09-21 the public URL is the domain:
+
+    https://lowtidedata.org/        (www. 301s here; HTTP 308s to HTTPS)
+
+`lowtidedata.org` is registered at Cloudflare Registrar (hig314@gmail.com). DNS is
+two A records, `@` and `www` → `209.38.5.101`, with the Cloudflare proxy **OFF**
+(grey cloud). Caddy has a site block per name (see `Caddyfile`), auto-issues the
+Let's Encrypt cert on first request and renews it; certs persist in
+`/opt/caddy/data/caddy_data/`. If the Cloudflare proxy is ever turned on, set its
+SSL mode to Full (strict) first, or the site breaks.
+
+Underneath, a DigitalOcean **Reserved IP, `209.38.5.101`**, is attached to the
+droplet, giving low_tide its own bare URL that still works as an HTTP fallback:
 
     http://209.38.5.101/
 
@@ -35,7 +46,7 @@ no per-interface binding. See `Caddyfile`.
   `web_external` network; serves `app/static/` read-only. Deployed to `/opt/lowtide/`.
 - `nginx.conf` — vhost; docroot = the app's `static/`, `index index_lt.html`.
 - `app/` — verbatim copy of the low_tide project (the `website/` contents).
-- `Caddyfile` — the updated `/opt/caddy/Caddyfile` (Host-based split). Reference copy.
+- `Caddyfile` — the updated `/opt/caddy/Caddyfile` (domain blocks + Host-based IP split). Reference copy.
 
 ## The one Linux fix (no source edit)
 
