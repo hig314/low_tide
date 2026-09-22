@@ -14,6 +14,19 @@
 # To add a real domain later, give it its own block, e.g.:
 #   lowtide.example.org { encode gzip; reverse_proxy lowtide:80 }
 # Caddy auto-issues a Let's Encrypt cert on first request.
+# --- lowtidedata.org: the real domain for low_tide (added 2026-09-21) ---
+# Caddy auto-issues/renews a Let's Encrypt cert (stored in ./data/caddy_data)
+# and redirects HTTP -> HTTPS for these names. DNS: Cloudflare, A records for
+# @ and www -> 209.38.5.101, proxy OFF (grey cloud) so issuance is direct.
+lowtidedata.org {
+    encode gzip
+    reverse_proxy lowtide:80
+}
+
+www.lowtidedata.org {
+    redir https://lowtidedata.org{uri} permanent
+}
+
 :80 {
     encode gzip
 

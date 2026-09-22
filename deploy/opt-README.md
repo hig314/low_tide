@@ -6,9 +6,13 @@ reverse-proxies to apps by their service/container name.
 
 ## Apps & addressing
 - **HWITW** — primary droplet IP `http://164.92.75.176/`.
-- **low_tide** — Reserved IP `http://209.38.5.101/` (its own bare "naked IP").
+- **low_tide** — **https://lowtidedata.org/** (Cloudflare-registered domain, DNS-only /
+  grey cloud, A records `@` + `www` → 209.38.5.101; `www` 301s to the apex; Caddy
+  auto-issues Let's Encrypt TLS). The Reserved IP `http://209.38.5.101/` still works
+  as a bare "naked IP" fallback.
 
-Both share Caddy's single `:80` listener; Caddy splits them on the **Host header**
+The domain has its own Caddy site blocks (:443, HTTP→HTTPS redirect). The two bare
+IPs share Caddy's single `:80` listener; Caddy splits them on the **Host header**
 (the IP you typed). DO routes the reserved IP onto `eth0` via 1:1 NAT, but the
 browser still sends `Host: 209.38.5.101`, so no second listener / per-IP bind is
 needed.
@@ -56,11 +60,12 @@ expected and unused. Hosting our own wxdb is a deferred step.
     docker logs lowtide --tail 50     # low_tide (nginx) logs
     docker logs caddy   --tail 50     # proxy logs
 
-## Adding a domain (later)
-Add to `/opt/caddy/Caddyfile`, e.g. for low_tide:
-    lowtide.example.org { encode gzip; reverse_proxy lowtide:80 }
-Point the domain's A record at this droplet (the relevant IP); Caddy auto-issues
-Let's Encrypt TLS. Then optionally redirect the IP block to the domain.
+## Domains
+low_tide's domain is done (see Caddyfile: `lowtidedata.org` + `www` blocks; certs live
+in `/opt/caddy/data/caddy_data/` and auto-renew). To add one for HWITW, do the same:
+point an A record at 164.92.75.176 (or a new reserved IP), add
+    example.org { encode gzip; reverse_proxy hwitw:5000 }
+to the Caddyfile, reload, and Caddy issues TLS on first request.
 
 ## Adding another app
 Create `/opt/<app>/docker-compose.yml` on `web_external` (external network),

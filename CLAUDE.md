@@ -1,6 +1,6 @@
 # low_tide — project state
 
-Snapshot for resuming after a break. Last worked: 2026-09-04.
+Snapshot for resuming after a break. Last worked: 2026-09-21.
 
 ## What this is
 
@@ -40,7 +40,9 @@ handoff.) Handoff history:
 
 ## Current status: DEPLOYED & LIVE ✅
 
-- **low_tide:** http://209.38.5.101/  (its own DigitalOcean Reserved IP — bare "naked IP", HTTP only)
+- **low_tide:** **https://lowtidedata.org/** (since 2026-09-21; `www.` 301s to the apex; HTTPS via
+  Caddy + Let's Encrypt, auto-renewing). The Reserved IP http://209.38.5.101/ still works as a
+  bare-IP HTTP fallback — old links don't break.
 - **HWITW:**    http://164.92.75.176/ (droplet's primary IP — untouched, still working)
 
 All containers are `restart: unless-stopped` and the Reserved IP is permanently
@@ -82,12 +84,19 @@ SSH: `ssh root@164.92.75.176` (local `~/.ssh/id_rsa`, key "macbook" on the accou
 - Droplet **hwitw** (id `574919305`), sfo3, 2GB/1vCPU/50GB, Ubuntu+Docker. ~1.4GB
   RAM free, 41GB disk free.
 - Reserved IP **209.38.5.101** (assigned to that droplet) → low_tide's bare URL.
+- **Domain `lowtidedata.org`** — registered 2026-09-21 at **Cloudflare Registrar** (account
+  hig314@gmail.com; nameservers clara/george.ns.cloudflare.com). DNS: A `@` and A `www` →
+  209.38.5.101, **proxy OFF (grey cloud)** — deliberate, so Caddy talks to browsers directly
+  and does its own ACME issuance. If the orange cloud is ever turned on, Cloudflare terminates
+  TLS itself and you must set its SSL mode to **Full (strict)** or the site loops/breaks.
 - Multi-app Docker host under `/opt`, all on the external network `web_external`:
   - `/opt/caddy/`   — Caddy 2, owns :80/:443, routes to apps by container name.
   - `/opt/hwitw/`   — HWITW Flask app (gunicorn :5000 internal).
   - `/opt/lowtide/` — this app (nginx :80 internal). ← created this session.
-- **Routing:** Caddy has one `:80` listener and splits the two apps on the **Host
-  header**. DO 1:1-NATs the reserved IP onto eth0, but the browser still sends
+- **Routing:** the domain has its own Caddy site blocks (`lowtidedata.org` →
+  `reverse_proxy lowtide:80`, `www` → redirect; Caddy auto-redirects HTTP→HTTPS for them;
+  certs persist in `/opt/caddy/data/caddy_data/`). For the bare IPs, Caddy has one `:80`
+  listener and splits the two apps on the **Host header**. DO 1:1-NATs the reserved IP onto eth0, but the browser still sends
   `Host: 209.38.5.101`, so `@lowtide host 209.38.5.101 -> reverse_proxy lowtide:80`,
   everything else -> hwitw. No second listener / per-IP bind needed.
 
@@ -142,9 +151,16 @@ is applied into `deploy/app/` and committed, so her versions diff cleanly.
     rsync -az refresh/refresh.sh root@164.92.75.176:/opt/lowtide/refresh/refresh.sh
     ssh root@164.92.75.176 'chmod +x /opt/lowtide/refresh/refresh.sh'
 
-    # verify live after deploy (Caddy routes lowtide on Host: 209.38.5.101; assets at /)
+    # verify live after deploy (assets at /, not /static/)
+    curl -s -o /dev/null -w '%{http_code}\n' https://lowtidedata.org/seldovia_sheet.js
+    # bare-IP fallback path (Caddy routes lowtide on Host: 209.38.5.101)
     curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: 209.38.5.101' \
       http://164.92.75.176/seldovia_sheet.js
+
+    # Caddy config lives in /opt/caddy/Caddyfile (reference copy: deploy/Caddyfile).
+    # After editing it:  validate, then reload (no container restart needed).
+    ssh root@164.92.75.176 'cd /opt/caddy && docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile \
+      && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile'
 
 ## Data refresh (cron)
 
@@ -178,9 +194,10 @@ exactly one runs at true 4 AM Anchorage, tracking DST.
 
 ## Possible follow-ups (not done, not blocking)
 
-- HTTPS: not possible on a bare IP (Let's Encrypt won't issue for IPs). If a domain
-  is pointed at 209.38.5.101, add a domain block to the Caddyfile and Caddy
-  auto-issues TLS. A commented example is in `deploy/Caddyfile`.
+- ~~HTTPS~~ — done 2026-09-21 via lowtidedata.org. Optional Cloudflare hardening not
+  yet done: enable DNSSEC (one click for a Cloudflare-registered domain) and add a CAA
+  record `0 issue "letsencrypt.org"`. Neither affects the running site.
+- HWITW has no domain; if it ever gets one, same recipe (see `deploy/opt-README.md`).
 - The droplet is small (2GB/1vCPU). low_tide is just static nginx so it's light,
   but keep an eye on RAM if HWITW or future siblings grow.
 - **No JS cache-busting.** Scripts load as plain `src="…​.js"` (no `?v=`/hash), so
