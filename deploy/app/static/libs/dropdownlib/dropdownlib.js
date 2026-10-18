@@ -114,6 +114,107 @@ class MultiselectDropdown {
 		}
 	}
 	get(){
+		console.log(this)
+		return this.selected.slice()
+	}
+	updateLabel(label){
+		this.header.innerHTML = label
+	}
+}
+
+class BetterDropdown {
+	constructor(container, {listener = null, style = null, auto_close = true, label = ''}){
+		this.container = container
+		this.button_div = makeNewElement(this.container,'div',{'class':'selectBox'})
+		this.button_div.addEventListener('click', () => this.toggleMenu());
+		
+		this.select = makeNewElement(this.button_div,'select',{'class':'header-button'})
+		this.header = makeNewElement(this.select,'option',{'class':'header-button'},label)
+		this.over_select = makeNewElement(this.button_div,'div',{'class':'overSelect'})
+		this.menu = makeNewElement(this.container,'div',{'style':"display: none;",'class':'menu'})
+		
+		this.listener = listener
+		this.auto_close = auto_close
+		this.open = false
+		this.checkboxes = []
+		this.labels = []
+		this.names = []
+		this.selected = null
+		this.length = 0
+		
+		document.addEventListener('click', (event) => {
+		    if (!this.container.contains(event.target) && this.open) {
+		        this.toggleMenu()
+		    }
+		});
+	}
+	toggleMenu(){
+		if (this.open){
+			this.menu.style.display = 'none';
+		} else {
+			this.menu.style.display = 'grid';
+		}
+		this.open = !this.open
+	}
+	addOption(value,title=null){
+		if (title === null){
+			title = value
+		}
+		let label = makeNewElement(this.menu,'label',{'class':'dropdownlabel'})
+		this.labels.push(label)
+		this.names.push(value)
+		let checkbox = makeNewElement(label,'input',{'class':'dropdownbox','type':'checkbox'})
+		label.append(title);
+		checkbox.addEventListener('change', () => this.handeler(value));
+		if (!this.length){
+			checkbox.checked = true;
+			this.selected = value
+		}
+		this.checkboxes.push(checkbox)
+		this.length ++
+	}
+	updateTitle(name,title){
+		let ind = this.names.indexOf(name);
+		this.labels[ind].childNodes[1].nodeValue = title; 
+	}
+	removeOption(name){
+		let i = this.selected.indexOf(name);
+		let ind = this.names.indexOf(name);
+		if (i > -1) {
+		  this.selected.splice(i, 1);
+		}
+		this.labels[ind].remove()
+		this.checkboxes.splice(ind, 1);
+		this.labels.splice(ind, 1);
+		this.names.splice(ind, 1);
+		this.length --
+	}
+	removeAll(){
+		for (let i = this.names.length-1; i>=0; i--){
+			this.removeOption(this.names[i])
+		}
+	}
+	handeler(ind){
+		if (ind === this.selected){
+			return
+		}
+		let i = this.names.indexOf(this.selected)
+		this.checkboxes[i].checked = false;
+		this.selected = ind
+		if (this.auto_close){
+			this.toggleMenu()
+		}
+		if (this.listener){
+			this.listener(this.selected)
+		}
+	}
+	set(val,run_event=false){
+		this.selected = val
+		if (run_event && this.listener){
+			this.listener(this.selected)
+		}
+	}
+	get(){
 		return this.selected.slice()
 	}
 	updateLabel(label){
