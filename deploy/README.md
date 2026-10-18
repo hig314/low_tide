@@ -5,6 +5,11 @@ DigitalOcean droplet **`hwitw`** (`164.92.75.176`, sfo3), sharing resources with
 the HWITW app already running there. The app source is deployed **verbatim** —
 this folder is only the deployment scaffolding around it.
 
+**Source:** public repo <https://github.com/hig314/low_tide> (public since
+2026-10-18). The app's authors push to `deploy/app/`. The rest of `deploy/` is
+the hosting layer. These docs contain no credentials and none should ever be
+added: tokens and SSH keys stay on the operator's machine and the droplet.
+
 ## What the app actually is
 
 `low_tide` ships as a Flask project (`webapp.py`), but the running app is **100%

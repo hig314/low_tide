@@ -1,6 +1,6 @@
 # low_tide — project state
 
-Snapshot for resuming after a break. Last worked: 2026-09-21.
+Snapshot for resuming after a break. Last worked: 2026-10-18.
 
 ## What this is
 
@@ -38,7 +38,23 @@ handoff.) Handoff history:
   refresh.sh now publishes 5 blobs, deploy rsync excludes 6, cron fixed to true
   4 AM Anchorage.
 
+## Public repo — what that means
+
+Since 2026-10-18 the GitHub repo is **public**, and that includes this file and
+everything under `deploy/`. Host IPs, the DNS layout and the account email
+written here are fine to share: they're public anyway through DNS, WHOIS-adjacent
+data or the site itself. **Never commit secrets**: no API tokens (`doctl`, Cloudflare,
+GitHub), SSH keys, `.env` files or passwords. Credentials stay on the Mac
+(`doctl` auth, `~/.ssh`) or on the droplet. Before each commit, check the diff for
+anything token-shaped. A history scan when the repo went public found nothing
+sensitive in any of its 17 commits. The data sources (Google Sheets, NOAA) are
+already public and need no auth.
+
 ## Change log (deploy-layer sessions, newest first)
+
+- **2026-10-18 — repo made public.** `github.com/hig314/low_tide` switched from
+  private to public. Docs updated to match (this file, `deploy/README.md`). No
+  infra, app or data changes.
 
 - **2026-09-21 — domain.** Put the site on **https://lowtidedata.org** (commit
   `e054709`). Registered at Cloudflare; DNS-only A records `@`+`www` → 209.38.5.101;
@@ -126,8 +142,9 @@ SSH: `ssh root@164.92.75.176` (local `~/.ssh/id_rsa`, key "macbook" on the accou
   `data_analysis/.../low_tide_app/` = the full HWITW repo (helm/docker/data tools).
 - `website.zip`, `Low_tide_data_analasys_web.zip` — the original archives.
 
-This folder is a **git repo** (`main`), pushed to a private GitHub repo
-`github.com/hig314/low_tide`. Archives (`*.zip`) and `extracted/` are gitignored;
+This folder is a **git repo** (`main`), pushed to the **public** GitHub repo
+`github.com/hig314/low_tide` (owned by hig314; katmai-mckittrick has write access;
+private until 2026-10-18). Archives (`*.zip`) and `extracted/` are gitignored;
 the deployed source of truth lives in `deploy/app/`. Each collaborator zip handoff
 is applied into `deploy/app/` and committed, so her versions diff cleanly.
 
