@@ -25,6 +25,7 @@ def update_data(end_date):
     try:
         file = open("Temp_data", 'rb')
         Temp_data,start_date = pickle.load(file)
+        print(Temp_data)
         file.close()
     except (FileNotFoundError,EOFError):
         Temp_data = []
@@ -68,7 +69,7 @@ def update_data(end_date):
         p_date = ''
         if len(Temp_data):
             p_date_time = datetime.datetime.strptime(Temp_data[-1]['date'],'%Y-%m-%d')
-            prev_p_date_time = datetime.datetime.strptime(Temp_data[-2]['date'],'%Y-%m-%d')
+            prev_p_date_time = p_date_time-datetime.timedelta(days=1)
         else:
             p_date_time = datetime.datetime.strptime('2004-01-01','%Y-%m-%d')
             prev_p_date_time = datetime.datetime.strptime('2003-12-31','%Y-%m-%d')
