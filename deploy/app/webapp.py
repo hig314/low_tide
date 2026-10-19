@@ -22,23 +22,21 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 from flask import Flask, render_template, request, Response, send_from_directory, redirect
 import html
 import json
+import MDS
 from flask_cors import CORS
+import lzw
 
 app = Flask(__name__)
 CORS(app) # CORS headers to make devel easier
 
 
 # return var data as json
-@app.route('/wxapp/getwxvar')
+@app.route('/requests/NMDS', methods = ['GET', 'POST'])
 def getwxvarjson():
-	var_lat = float(request.args.get( 'lat',  default=33.4484 ))
-	var_long = float(request.args.get( 'lon', default=-112.0740 ))
-	json_data = wxdata.get_wxvar( var_lat, var_long )
-	resp = Response( json_data, mimetype='application/json')
-	resp.headers['Access-Control-Allow-Origin'] = '*' # get around CORS during development
-	print('getwxvarjson')
-	#print(resp)	#debug
-	return resp
+        data = MDS.NMDS(lzw.lzw_decode(request.get_json()))
+        resp = Response( json.dumps(data.tolist()), mimetype='application/json')
+        #resp.headers['Access-Control-Allow-Origin'] = '*' # get around CORS during development
+        return resp
 
 # return reading/weather variables as json
 @app.route('/wxapp/wxvars')
@@ -52,7 +50,7 @@ def wxvarsjson():
 # redirect to root route
 @app.route('/')
 def approute():
-    return redirect('/static/index.html')
+    return redirect('/static/main/index_lt.html')
 
 # With debug=True, Flask server will auto-reload 
 # when there are code changes
