@@ -63,8 +63,10 @@ already public and need no auth.
 
 - **2026-10-18 — data refresh restored.** Deployed her `Get_temp_data.py` fix
   (`d807c91`), code-only (rsync, no container changes). First successful refresh
-  since 2026-09-07; all 5 blobs republished. Details + the pickle's positional
-  layout under "Data refresh (cron)".
+  since 2026-09-07; all 5 blobs republished. Then, at the user's request, a
+  **full temp refetch from 2004** (NOAA had backfilled its summer outage and
+  fixed bad late-June values); 71 positions changed, all 2026. Details + the
+  pickle's positional layout under "Data refresh (cron)".
 
 - **2026-10-18 — NMDS backend + subfolder pages.** Deployed the 2026-10-18 git
   handoff. New `deploy/api/Dockerfile` → container **`lowtide-api`** (her
@@ -265,9 +267,17 @@ exactly one runs at true 4 AM Anchorage, tracking DST.
   temperatures up by index = days since 2004-01-01 (`low_tide_data_procesting.js`);
   the `date` labels are ignored. Entry count == calendar days from 2004-01-02.
   NOAA gaps are filled with N copies labeled with the date *after* the gap
-  (currently 3× `2011-01-01`, 12× `2012-01-01`, 69× `2026-09-07` for the Jun 30–
-  Sep 5 2026 outage). Those duplicates are what keep alignment; removing them
-  shifts every later temperature. Alignment check: `len(data) == (last − first).days + 1`.
+  (currently 3× `2011-01-01`, 12× `2012-01-01`). Those duplicates are what keep
+  alignment; removing them shifts every later temperature. Alignment check:
+  `len(data) == (last − first).days + 1`.
+- **Full refetch (2026-10-18):** NOAA later backfilled its Jun 30–Sep 5 2026 outage
+  and corrected bad late-June values (06-28/29 were 1.85 °C → now 8.67/5.67), so we
+  rebuilt the pickle from 2004. Safe recipe, never delete in place: run her
+  `Get_temp_data.update_data(today)` with the refresh venv in an empty staging dir
+  (one-year chunks, saves per chunk, rerun resumes; ~1 run, a few seconds), compare
+  with the live pickle (alignment + which positions changed: only 71, all 2026),
+  then `mv` the live one aside and copy the new one in, and run `refresh.sh`.
+  Backups in `work/`: `Temp_data.pre-fix-20261018`, `Temp_data.pre-refetch-20261018`.
 - **Resolved outage (2026-09-08 → 2026-10-18): the refresh failed daily for six
   weeks** (data frozen at 2026-09-07, sheets too, since the crash aborted
   `download.py` before them). Cause: the 69 duplicates sat at the *end* of the
