@@ -37,6 +37,15 @@ handoff.) Handoff history:
   duplicate (page always used `libs/nouislider/`). Deploy-layer changes ours:
   refresh.sh now publishes 5 blobs, deploy rsync excludes 6, cron fixed to true
   4 AM Anchorage.
+- **git push** — 2026-10-18 (13 commits + our PR #1): **pages moved into
+  subfolders** — `static/main/index_lt.html` and a new **NMDS page**
+  `static/NMDS/index_NMDS.html` (+ an `info.html` each); shared code split out to
+  `static/ltda_root.js`. The NMDS page has the app's **first backend call**
+  (`POST /requests/NMDS`, answered by `webapp.py` + new `MDS.py`/`lzw.py`,
+  scikit-learn). Her `requirements.txt` wasn't pip-installable (listed stdlib
+  modules); we fixed it via **PR #1, which she merged** — her files go through PRs,
+  never direct edits. Deploy-layer changes ours: `lowtide-api` container, nginx
+  `/static/` alias + redirects + `/requests/` proxy. See change log.
 
 ## Public repo — what that means
 
@@ -52,6 +61,18 @@ already public and need no auth.
 
 ## Change log (deploy-layer sessions, newest first)
 
+- **2026-10-18 — NMDS backend + subfolder pages.** Deployed the 2026-10-18 git
+  handoff. New `deploy/api/Dockerfile` → container **`lowtide-api`** (her
+  `webapp.py` unmodified under gunicorn; 1 worker, 120 s timeout, 0.75 CPU,
+  768 MB, private `lowtide_internal` network). `nginx.conf`: `/static/X` aliases
+  `/X`, `/` 302 → `/static/main/index_lt.html`, `/index_lt.html` 301 → same,
+  `absolute_redirect off`, `no-cache` on `.js`/`.html` (closes the old
+  cache-busting follow-up), `/requests/` proxy with 10/min/IP rate limit (burst 5,
+  429), 1 MB body cap. Tested locally in Docker first, then live (all pages,
+  redirects, bare IP, NMDS graph in a browser; 400 rows ≈ 14 s on the droplet).
+  Droplet backups: `/opt/lowtide/{docker-compose.yml,nginx.conf}.bak-20261018`.
+  ⚠️ Found during the SOP refresh: **the data refresh has been failing daily since
+  2026-09-08** — see "Known issue" under Data refresh.
 - **2026-10-18 — repo made public.** `github.com/hig314/low_tide` switched from
   private to public. Docs updated to match (this file, `deploy/README.md`). No
   infra, app or data changes.
@@ -70,7 +91,8 @@ already public and need no auth.
 ## Current status: DEPLOYED & LIVE ✅
 
 - **low_tide:** **https://lowtidedata.org/** (since 2026-09-21; `www.` 301s to the apex; HTTPS via
-  Caddy + Let's Encrypt, auto-renewing). The Reserved IP http://209.38.5.101/ still works as a
+  Caddy + Let's Encrypt, auto-renewing). `/` redirects to `/static/main/index_lt.html`;
+  NMDS page at `/static/NMDS/index_NMDS.html`. The Reserved IP http://209.38.5.101/ still works as a
   bare-IP HTTP fallback — old links don't break.
 - **HWITW:**    http://164.92.75.176/ (droplet's primary IP — untouched, still working)
 
@@ -79,7 +101,10 @@ assigned, so everything survives a droplet reboot. Safe to walk away.
 
 ## Key facts (the non-obvious stuff)
 
-- **The app is 100% static.** `static/index_lt.html` + JS with pre-baked data.
+- **The app is static except one endpoint.** Pages `static/main/index_lt.html` and
+  `static/NMDS/index_NMDS.html` + JS with pre-baked data; shared code in
+  `static/ltda_root.js` + `static/libs/`. Page-to-page links are hard-coded to
+  `/static/...` (her Flask dev layout), hence our nginx `/static/` alias.
   Two datasets, picked via the area selector (`<select id=area_select>`):
   `static/seldovia_sheet.js` (~2.7MB) and `static/costal_studies_sheet.js` (~558KB),
   plus shared `static/Temp_data.js` (~758KB) and, since 2026-09-04, two location
@@ -87,13 +112,15 @@ assigned, so everything survives a droplet reboot. Safe to walk away.
   ⚠️ The location blobs are **generated-only — not in git**; they exist solely on
   the droplet (published by the refresh). That makes their rsync excludes
   load-bearing: without them, `--delete` wipes them off the live site.
-  The frontend makes **zero** backend calls.
-  It's served by plain `nginx:alpine` with the `static/` dir as the web root, so
-  assets resolve at `/` (e.g. `/seldovia_sheet.js`), **not** under `/static/`.
-- **`webapp.py` is dead weight here.** It's a vestigial copy of HWITW's Flask
-  server: it `import wxdata` (a module that isn't present in this project) and
-  redirects `/` to a nonexistent `index.html`. We do NOT run it. If anyone asks
-  "why isn't the Flask app running" — it can't, and nothing needs it.
+  The only backend call is the NMDS page's `POST /requests/NMDS`.
+  Static files are served by plain `nginx:alpine` with the `static/` dir as the web
+  root, so every asset resolves both at `/X` and (via the alias) `/static/X`.
+- **`webapp.py` is live since 2026-10-18** — but only its `/requests/NMDS` route
+  (with `MDS.py` + `lzw.py`), run unmodified by gunicorn in `lowtide-api`. Its
+  `/wxapp/*` routes are HWITW leftovers (`wxdata` isn't imported) and its `/`
+  redirect is irrelevant (nginx owns `/`). The `Authorization: Basic weird:weather`
+  header the NMDS page sends is also an HWITW leftover; nothing checks it. NMDS is
+  CPU-bound: ~14 s for 400 rows on the droplet (one worker, so requests queue).
 - **Linux case-sensitivity fix (deploy-layer, not a source edit):** `index_lt.html`
   loads `temp_data.js` but the actual file is `Temp_data.js`. Invisible on the
   dev's case-insensitive Mac; a 404 on Linux (breaks "Show temperature"). Fixed by
@@ -121,7 +148,8 @@ SSH: `ssh root@164.92.75.176` (local `~/.ssh/id_rsa`, key "macbook" on the accou
 - Multi-app Docker host under `/opt`, all on the external network `web_external`:
   - `/opt/caddy/`   — Caddy 2, owns :80/:443, routes to apps by container name.
   - `/opt/hwitw/`   — HWITW Flask app (gunicorn :5000 internal).
-  - `/opt/lowtide/` — this app (nginx :80 internal). ← created this session.
+  - `/opt/lowtide/` — this app: `lowtide` (nginx :80 internal) + `lowtide-api`
+    (gunicorn :5000, reachable only from nginx on `lowtide_internal`).
 - **Routing:** the domain has its own Caddy site blocks (`lowtidedata.org` →
   `reverse_proxy lowtide:80`, `www` → redirect; Caddy auto-redirects HTTP→HTTPS for them;
   certs persist in `/opt/caddy/data/caddy_data/`). For the bare IPs, Caddy has one `:80`
@@ -132,7 +160,8 @@ SSH: `ssh root@164.92.75.176` (local `~/.ssh/id_rsa`, key "macbook" on the accou
 ## This folder
 
 - `deploy/` — the deployment framework (see `deploy/README.md` for full ops):
-  - `docker-compose.yml`, `nginx.conf` — the lowtide stack (deployed to `/opt/lowtide/`).
+  - `docker-compose.yml`, `nginx.conf`, `api/Dockerfile` — the lowtide stack
+    (nginx + NMDS backend), deployed to `/opt/lowtide/`.
   - `Caddyfile` — reference copy of the updated `/opt/caddy/Caddyfile`.
   - `opt-README.md` — reference copy of the droplet's updated `/opt/README.md`.
   - `app/` — verbatim copy of the low_tide project (the `website/` contents).
@@ -164,11 +193,13 @@ is applied into `deploy/app/` and committed, so her versions diff cleanly.
       --exclude 'static/seldovia_sheet.js' --exclude 'static/costal_studies_sheet.js' \
       --exclude 'static/Temp_data.js' --exclude 'static/temp_data.js' \
       --exclude 'static/seldovia_locations.js' --exclude 'static/costal_studies_locations.js' \
-      docker-compose.yml nginx.conf app  root@164.92.75.176:/opt/lowtide/
+      docker-compose.yml nginx.conf api app  root@164.92.75.176:/opt/lowtide/
+    # --force-recreate: rsync swaps nginx.conf's inode and a single-file bind mount
+    # keeps the old one until recreate. --build: picks up requirements.txt changes.
     ssh root@164.92.75.176 '
       cp -f /opt/lowtide/app/static/Temp_data.js /opt/lowtide/app/static/temp_data.js
-      chmod -R a+rX /opt/lowtide/app
-      cd /opt/lowtide && docker compose up -d'
+      chmod -R a+rX /opt/lowtide/app /opt/lowtide/api
+      cd /opt/lowtide && docker compose up -d --build --force-recreate'
 
     # SOP: ALWAYS run a manual data refresh after a code deploy (a code update can
     # add/change generated blobs — e.g. the 2026-09-04 one added the location
@@ -181,8 +212,12 @@ is applied into `deploy/app/` and committed, so her versions diff cleanly.
     rsync -az refresh/refresh.sh root@164.92.75.176:/opt/lowtide/refresh/refresh.sh
     ssh root@164.92.75.176 'chmod +x /opt/lowtide/refresh/refresh.sh'
 
-    # verify live after deploy (assets at /, not /static/)
+    # verify live after deploy (assets resolve at both /X and /static/X)
+    curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://lowtidedata.org/   # 302 -> /static/main/
+    curl -s -o /dev/null -w '%{http_code}\n' https://lowtidedata.org/static/NMDS/index_NMDS.html
     curl -s -o /dev/null -w '%{http_code}\n' https://lowtidedata.org/seldovia_sheet.js
+    # NMDS backend: open the NMDS page, click Generate; or check the logs
+    ssh root@164.92.75.176 'docker logs lowtide-api --tail 5'
     # bare-IP fallback path (Caddy routes lowtide on Host: 209.38.5.101)
     curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: 209.38.5.101' \
       http://164.92.75.176/seldovia_sheet.js
@@ -221,6 +256,17 @@ exactly one runs at true 4 AM Anchorage, tracking DST.
   days self-heal on the next success (incremental backfill). `refresh.sh` still adds
   belt-and-suspenders: retries, keeps last-good on any hard failure, and logs.
 - Check it: `ssh root@164.92.75.176 'crontab -l; tail -20 /opt/lowtide/refresh/refresh.log'`
+- ⚠️ **Known issue (open, found 2026-10-18): every refresh since 2026-09-08 has
+  failed**, so live data is frozen at 2026-09-07. Cause: the `Temp_data` pickle
+  ends with five identical `2026-09-07` entries. `Get_temp_data.update_data`
+  appends `(p_date_time - prev_p_date_time).days` copies per day, measured between
+  the last two entries; a 0-day gap appends nothing, and
+  `new_data[-1]` → `IndexError`. NOAA itself is fine (200 with data). The crash
+  aborts `download.py` before the Google Sheets step, so sheets are stale too.
+  It won't self-heal. Not yet fixed; options: (a) her code fix via PR (the right
+  long-term fix — the duplicates come from that append logic), (b) trim the
+  trailing duplicates from the pickle (back it up first; the pickle is ours, in
+  `work/`). The failure is log-only, which is why nobody noticed for six weeks.
 
 ## Possible follow-ups (not done, not blocking)
 
@@ -230,8 +276,12 @@ exactly one runs at true 4 AM Anchorage, tracking DST.
 - HWITW has no domain; if it ever gets one, same recipe (see `deploy/opt-README.md`).
 - The droplet is small (2GB/1vCPU). low_tide is just static nginx so it's light,
   but keep an eye on RAM if HWITW or future siblings grow.
-- **No JS cache-busting.** Scripts load as plain `src="…​.js"` (no `?v=`/hash), so
-  after a handoff that changes JS, a browser can serve a stale cached copy until a
-  hard refresh (this bit us once on the `website 3.zip` `clearListeners` change —
-  the deploy was correct; the browser cache was stale). If it recurs, add a no-cache
-  header for `*.js` in our `nginx.conf` (deploy-layer, doesn't touch her files).
+- ~~No JS cache-busting~~ — done 2026-10-18: nginx sends `Cache-Control: no-cache`
+  on `.js`/`.html` (browsers revalidate via ETag; unchanged files are cheap 304s).
+- **Fix the stalled data refresh** — see "Known issue" under Data refresh.
+- **Refresh failures are silent** (log-only). Worth an alert (e.g. email or a
+  healthcheck ping on failure) so a multi-week outage can't recur unnoticed.
+- Notes for her (not blocking): the NMDS page's `run_graph` calls
+  `response.json()` even on a non-OK response, so a 429/502/504 leaves the page
+  stuck (`waiting` never resets) until reload; `main/index_lt.html` loads
+  `../test.js`, which re-inits `date_slider` (one console error, harmless).

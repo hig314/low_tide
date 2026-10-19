@@ -25,10 +25,15 @@ needed.
   - Image built from `repo/helm/Dockerfile` (context `repo/src`), tagged `hwitw:gta`.
   - gunicorn serves on :5000 (internal). Caddy proxies the primary IP :80 → hwitw:5000.
 - `/opt/lowtide/` — low_tide intertidal data-analysis app (the "sibling app").
-  - Static-only: `nginx:alpine` serving `app/static/` (verbatim project copy);
-    `index_lt.html` + pre-baked `sheet.js`/`Temp_data.js`, no backend calls.
-  - Container `lowtide` exposes :80 internally. Caddy proxies the reserved IP
-    (Host `209.38.5.101`) → lowtide:80.
+  - `nginx:alpine` container `lowtide` serving `app/static/` (verbatim project
+    copy) with pre-baked data blobs. Pages: `/static/main/index_lt.html` (`/` 302s
+    there) and `/static/NMDS/index_NMDS.html`.
+  - Since 2026-10-18 also `lowtide-api` (built from `api/Dockerfile`): the app's
+    `webapp.py` under gunicorn, answering the NMDS page's `POST /requests/NMDS`
+    (scikit-learn). nginx proxies `/requests/` to it over the private
+    `lowtide_internal` network; capped at 0.75 CPU / 768 MB, rate-limited in nginx.
+  - Container `lowtide` exposes :80 internally. Caddy proxies `lowtidedata.org` and
+    the reserved IP (Host `209.38.5.101`) → lowtide:80.
   - Deploy-time fix: `cp app/static/Temp_data.js app/static/temp_data.js` (the
     HTML references the lowercase name; Linux is case-sensitive, the dev's Mac
     wasn't). Source files are otherwise untouched.
@@ -54,10 +59,11 @@ expected and unused. Hosting our own wxdb is a deferred step.
 
 ## Common ops
     cd /opt/hwitw && git -C repo pull --ff-only && docker compose build && docker compose up -d   # update HWITW
-    cd /opt/lowtide && docker compose up -d         # (re)start low_tide after content sync
+    cd /opt/lowtide && docker compose up -d --build --force-recreate   # (re)start low_tide after a sync
     docker ps                         # status
     docker logs hwitw   --tail 50     # HWITW app logs
     docker logs lowtide --tail 50     # low_tide (nginx) logs
+    docker logs lowtide-api --tail 50 # low_tide NMDS backend (gunicorn) logs
     docker logs caddy   --tail 50     # proxy logs
 
 ## Domains
