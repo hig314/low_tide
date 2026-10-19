@@ -25,7 +25,6 @@ def update_data(end_date):
     try:
         file = open("Temp_data", 'rb')
         Temp_data,start_date = pickle.load(file)
-        print(Temp_data)
         file.close()
     except (FileNotFoundError,EOFError):
         Temp_data = []
