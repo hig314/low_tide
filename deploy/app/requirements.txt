@@ -3,3 +3,4 @@ json
 csv
 pickle
 requests
+sklearn.manifold
