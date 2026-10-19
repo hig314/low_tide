@@ -2,10 +2,41 @@
 
 Snapshot for resuming after a break. Last worked: 2026-10-18.
 
+## ▶ Where we left off (2026-10-18) — read this first
+
+**Everything is deployed, verified and committed. Nothing is mid-flight.**
+
+- **Live:** https://lowtidedata.org — main page + new NMDS page, both verified in a
+  browser. Containers `lowtide` (nginx) + `lowtide-api` (NMDS backend, new today)
+  up; HWITW + Caddy untouched.
+- **Code deployed:** her `main` through `f330cf7` (all her pushes to date).
+  Deploy-layer: `deploy/api/Dockerfile`, compose + `nginx.conf` changes (commit
+  `9af6673`). Our PR #1 (`requirements.txt`) merged by her.
+- **Data current:** refresh fixed (her `d807c91`) after a 6-week silent outage;
+  temp history fully refetched from NOAA (corrected 2026 summer). Last refresh
+  succeeded 2026-10-19 03:00 UTC; the 4 AM Anchorage cron continues daily.
+- **Repo:** `main` clean and in sync with GitHub at `5a1bb31`; no open PRs or branches.
+- **Rollback / backups on the droplet** (prune once things have run clean for a
+  while): `/opt/lowtide/{docker-compose.yml,nginx.conf}.bak-20261018`,
+  `/opt/lowtide/refresh/work/Temp_data.pre-fix-20261018` and `.pre-refetch-20261018`.
+
+**Open items (none urgent)** — details in "Possible follow-ups":
+1. **Alert on refresh failure.** Failures are still log-only; that's how the
+   outage went unnoticed. Top priority.
+2. Notes to send her: NMDS page hangs after a non-OK response (`low_tide_NMDS.js`
+   `run_graph`); `main/index_lt.html` still loads `../test.js`.
+3. Housekeeping: prune the backups above; optional Cloudflare DNSSEC/CAA.
+
+**First thing on restart:** `ssh root@164.92.75.176 'docker ps; tail -3
+/opt/lowtide/refresh/refresh.log'` (expect 4 containers up and
+`refresh end (success)`), then `git fetch && git log --oneline main..origin/main`
+for new handoffs.
+
 ## What this is
 
-**low_tide** = the *Kachemak Bay intertidal data analysis tool* — a static web app
-for exploring low-tide species/observation data. It is deployed as a sibling app
+**low_tide** = the *Kachemak Bay intertidal data analysis tool* — a mostly static
+web app (plus one small backend endpoint for the NMDS page) for exploring low-tide
+species/observation data. It is deployed as a sibling app
 alongside **HWITW** (How Weird is the Weather) on a shared DigitalOcean droplet.
 
 This folder holds the source (zipped + extracted) and the **deployment framework**
@@ -46,6 +77,9 @@ handoff.) Handoff history:
   modules); we fixed it via **PR #1, which she merged** — her files go through PRs,
   never direct edits. Deploy-layer changes ours: `lowtide-api` container, nginx
   `/static/` alias + redirects + `/requests/` proxy. See change log.
+- **git push** — 2026-10-18, two follow-ups to `Get_temp_data.py`: `d807c91` fixes
+  the refresh crash (previous day = last label − 1), `f330cf7` removes the debug
+  `print` it added. Both deployed code-only (rsync + SOP refresh, no containers).
 
 ## Public repo — what that means
 
@@ -101,6 +135,8 @@ already public and need no auth.
   Caddy + Let's Encrypt, auto-renewing). `/` redirects to `/static/main/index_lt.html`;
   NMDS page at `/static/NMDS/index_NMDS.html`. The Reserved IP http://209.38.5.101/ still works as a
   bare-IP HTTP fallback — old links don't break.
+- **NMDS backend:** container `lowtide-api`, reached only via nginx at `/requests/`.
+- **Data:** refreshing daily again (fixed 2026-10-18); temps through 2026-10-18.
 - **HWITW:**    http://164.92.75.176/ (droplet's primary IP — untouched, still working)
 
 All containers are `restart: unless-stopped` and the Reserved IP is permanently
@@ -144,8 +180,8 @@ assigned, so everything survives a droplet reboot. Safe to walk away.
 DigitalOcean account `hig314@gmail.com`, `doctl` is authenticated locally.
 SSH: `ssh root@164.92.75.176` (local `~/.ssh/id_rsa`, key "macbook" on the account).
 
-- Droplet **hwitw** (id `574919305`), sfo3, 2GB/1vCPU/50GB, Ubuntu+Docker. ~1.4GB
-  RAM free, 41GB disk free.
+- Droplet **hwitw** (id `574919305`), sfo3, 2GB/1vCPU/50GB, Ubuntu+Docker. ~1.3GB
+  RAM available, 38GB disk free (2026-10-18, after adding `lowtide-api`).
 - Reserved IP **209.38.5.101** (assigned to that droplet) → low_tide's bare URL.
 - **Domain `lowtidedata.org`** — registered 2026-09-21 at **Cloudflare Registrar** (account
   hig314@gmail.com; nameservers clara/george.ns.cloudflare.com). DNS: A `@` and A `www` →
@@ -189,6 +225,12 @@ is applied into `deploy/app/` and committed, so her versions diff cleanly.
     # status / logs
     ssh root@164.92.75.176 'docker ps'
     ssh root@164.92.75.176 'docker logs lowtide --tail 50'
+    ssh root@164.92.75.176 'docker logs lowtide-api --tail 50'
+
+    # Code-only handoff (just her app files changed, no deploy-layer edits): the
+    # rsync below + chmod + SOP refresh is enough; refresh.sh copies her *.py into
+    # work/ itself. webapp.py/MDS.py/lzw.py changes need `docker compose restart
+    # lowtide-api`; requirements.txt changes need the full --build line.
 
     # redeploy after changing app content or the framework (from deploy/).
     # NOTE: the six data-blob excludes are deliberate — the cron owns live data;
@@ -251,9 +293,10 @@ exactly one runs at true 4 AM Anchorage, tracking DST.
   2 tabs each: observations + "Location info") and NOAA station 9455500 water
   temperature. The NOAA temp fetch is **incremental**
   and stateful — the `Temp_data` pickle lives in `work/` and must persist; never
-  delete it (else it refetches from 2004).
+  delete it in place (a full refetch is possible — use the staged recipe below).
 - **Isolation = cron owns data, handoffs own code.** The deploy rsync excludes the
-  4 generated blobs (see Common ops) so the two never collide. We touch none of her
+  6 generated blob names (5 blobs + the `temp_data.js` alias; see Common ops) so
+  the two never collide. We touch none of her
   files; all cron infra lives in `deploy/refresh/` ↔ `/opt/lowtide/refresh/`.
 - **Failure = log-only, and NOAA outages now degrade gracefully.** NOAA's
   `water_temperature` product 5xx's intermittently. Since the `website 4.zip`
@@ -298,8 +341,10 @@ exactly one runs at true 4 AM Anchorage, tracking DST.
   yet done: enable DNSSEC (one click for a Cloudflare-registered domain) and add a CAA
   record `0 issue "letsencrypt.org"`. Neither affects the running site.
 - HWITW has no domain; if it ever gets one, same recipe (see `deploy/opt-README.md`).
-- The droplet is small (2GB/1vCPU). low_tide is just static nginx so it's light,
-  but keep an eye on RAM if HWITW or future siblings grow.
+- The droplet is small (2GB/1vCPU). low_tide's nginx is light; `lowtide-api` idles
+  ~130 MB and is capped at 0.75 CPU / 768 MB. Keep an eye on RAM if HWITW or future
+  siblings grow, and on NMDS latency if usage picks up (one worker; requests queue).
+- Prune the 2026-10-18 droplet backups (see "Where we left off") once stable.
 - ~~No JS cache-busting~~ — done 2026-10-18: nginx sends `Cache-Control: no-cache`
   on `.js`/`.html` (browsers revalidate via ETag; unchanged files are cheap 304s).
 - **Refresh failures are silent** (log-only; a 6-week outage went unnoticed). Worth an alert (e.g. email or a
