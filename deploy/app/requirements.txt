@@ -1,6 +1,10 @@
-datetime
-json
-csv
-pickle
+# Third-party packages only (pip install -r requirements.txt).
+# json, csv, pickle, datetime and html ship with Python and can't be pip-installed.
+
+# data refresh (download.py, Get_data.py, Get_temp_data.py)
 requests
-sklearn.manifold
+
+# NMDS server (webapp.py, MDS.py)
+flask
+flask-cors
+scikit-learn>=1.8   # MDS(init='classical_mds', metric_mds=...) needs 1.8+
