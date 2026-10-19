@@ -61,6 +61,11 @@ already public and need no auth.
 
 ## Change log (deploy-layer sessions, newest first)
 
+- **2026-10-18 — data refresh restored.** Deployed her `Get_temp_data.py` fix
+  (`d807c91`), code-only (rsync, no container changes). First successful refresh
+  since 2026-09-07; all 5 blobs republished. Details + the pickle's positional
+  layout under "Data refresh (cron)".
+
 - **2026-10-18 — NMDS backend + subfolder pages.** Deployed the 2026-10-18 git
   handoff. New `deploy/api/Dockerfile` → container **`lowtide-api`** (her
   `webapp.py` unmodified under gunicorn; 1 worker, 120 s timeout, 0.75 CPU,
@@ -71,8 +76,8 @@ already public and need no auth.
   429), 1 MB body cap. Tested locally in Docker first, then live (all pages,
   redirects, bare IP, NMDS graph in a browser; 400 rows ≈ 14 s on the droplet).
   Droplet backups: `/opt/lowtide/{docker-compose.yml,nginx.conf}.bak-20261018`.
-  ⚠️ Found during the SOP refresh: **the data refresh has been failing daily since
-  2026-09-08** — see "Known issue" under Data refresh.
+  ⚠️ Found during the SOP refresh: **the data refresh had been failing daily since
+  2026-09-08** — fixed the same day, see the entry above.
 - **2026-10-18 — repo made public.** `github.com/hig314/low_tide` switched from
   private to public. Docs updated to match (this file, `deploy/README.md`). No
   infra, app or data changes.
@@ -256,17 +261,26 @@ exactly one runs at true 4 AM Anchorage, tracking DST.
   days self-heal on the next success (incremental backfill). `refresh.sh` still adds
   belt-and-suspenders: retries, keeps last-good on any hard failure, and logs.
 - Check it: `ssh root@164.92.75.176 'crontab -l; tail -20 /opt/lowtide/refresh/refresh.log'`
-- ⚠️ **Known issue (open, found 2026-10-18): every refresh since 2026-09-08 has
-  failed**, so live data is frozen at 2026-09-07. Cause: the `Temp_data` pickle
-  ends with five identical `2026-09-07` entries. `Get_temp_data.update_data`
-  appends `(p_date_time - prev_p_date_time).days` copies per day, measured between
-  the last two entries; a 0-day gap appends nothing, and
-  `new_data[-1]` → `IndexError`. NOAA itself is fine (200 with data). The crash
-  aborts `download.py` before the Google Sheets step, so sheets are stale too.
-  It won't self-heal. Not yet fixed; options: (a) her code fix via PR (the right
-  long-term fix — the duplicates come from that append logic), (b) trim the
-  trailing duplicates from the pickle (back it up first; the pickle is ours, in
-  `work/`). The failure is log-only, which is why nobody noticed for six weeks.
+- **`Temp_data` pickle is POSITIONAL — never trim or dedupe it.** The page looks
+  temperatures up by index = days since 2004-01-01 (`low_tide_data_procesting.js`);
+  the `date` labels are ignored. Entry count == calendar days from 2004-01-02.
+  NOAA gaps are filled with N copies labeled with the date *after* the gap
+  (currently 3× `2011-01-01`, 12× `2012-01-01`, 69× `2026-09-07` for the Jun 30–
+  Sep 5 2026 outage). Those duplicates are what keep alignment; removing them
+  shifts every later temperature. Alignment check: `len(data) == (last − first).days + 1`.
+- **Resolved outage (2026-09-08 → 2026-10-18): the refresh failed daily for six
+  weeks** (data frozen at 2026-09-07, sheets too, since the crash aborted
+  `download.py` before them). Cause: the 69 duplicates sat at the *end* of the
+  pickle, and `update_data` derived the day gap from the last two labels → 0 →
+  `new_data[-1]` IndexError. Her fix (commit `d807c91`) takes the previous day as
+  last label − 1. Tested locally on a copy of the live pickle (aligned, same-day
+  rerun idempotent), deployed 2026-10-18; refresh succeeded first try, 41 days
+  backfilled, 8326 entries aligned. Pre-fix backup on the droplet:
+  `work/Temp_data.pre-fix-20261018`. Failures are log-only, which is why nobody
+  noticed for six weeks — see follow-ups.
+- Her `d807c91` also added `print(Temp_data)` (~420 KB per run into
+  `refresh.log`). `refresh.sh` rotates at 5 MB (one `.1` kept), so history is now
+  only ~3–4 weeks. Harmless; ask her to drop the debug print.
 
 ## Possible follow-ups (not done, not blocking)
 
@@ -278,8 +292,7 @@ exactly one runs at true 4 AM Anchorage, tracking DST.
   but keep an eye on RAM if HWITW or future siblings grow.
 - ~~No JS cache-busting~~ — done 2026-10-18: nginx sends `Cache-Control: no-cache`
   on `.js`/`.html` (browsers revalidate via ETag; unchanged files are cheap 304s).
-- **Fix the stalled data refresh** — see "Known issue" under Data refresh.
-- **Refresh failures are silent** (log-only). Worth an alert (e.g. email or a
+- **Refresh failures are silent** (log-only; a 6-week outage went unnoticed). Worth an alert (e.g. email or a
   healthcheck ping on failure) so a multi-week outage can't recur unnoticed.
 - Notes for her (not blocking): the NMDS page's `run_graph` calls
   `response.json()` even on a non-OK response, so a 429/502/504 leaves the page
