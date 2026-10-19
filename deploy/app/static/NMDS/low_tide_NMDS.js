@@ -37,8 +37,8 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 		this.colors.addOption('tide','Tide');
 		this.params['colors'] = [this.colors,'get']
 		document.getElementById('generate').addEventListener("click", () => this.run());
-		document.getElementById('redirect').href=`http://${window.location.host}/static/main/index_lt.html`
-		document.getElementById('info').href=`http://${window.location.host}/static/NMDS/info.html`
+		document.getElementById('redirect').href=`${window.location.protocol}//${window.location.host}/static/main/index_lt.html`
+		document.getElementById('info').href=`${window.location.protocol}//${window.location.host}/static/NMDS/info.html`
     }
 	
 	activate(){
