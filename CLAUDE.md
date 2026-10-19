@@ -288,9 +288,9 @@ exactly one runs at true 4 AM Anchorage, tracking DST.
   backfilled, 8326 entries aligned. Pre-fix backup on the droplet:
   `work/Temp_data.pre-fix-20261018`. Failures are log-only, which is why nobody
   noticed for six weeks — see follow-ups.
-- Her `d807c91` also added `print(Temp_data)` (~420 KB per run into
-  `refresh.log`). `refresh.sh` rotates at 5 MB (one `.1` kept), so history is now
-  only ~3–4 weeks. Harmless; ask her to drop the debug print.
+- Her `d807c91` also added a debug `print(Temp_data)` (~420 KB per run into
+  `refresh.log`); she removed it in `f330cf7` (deployed 2026-10-18; a run now
+  logs ~300 bytes). `refresh.sh` rotates the log at 5 MB, keeping one `.1`.
 
 ## Possible follow-ups (not done, not blocking)
 
