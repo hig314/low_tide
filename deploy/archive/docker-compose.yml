@@ -1,0 +1,40 @@
+services:
+  # Frozen archive of low_tide (archive.lowtidedata.org), deployed to
+  # /opt/lowtide-archive/. Same layout as ../docker-compose.yml, but app/ is a
+  # pinned commit of katmai-mckittrick/low_tide_archive and the data blobs were
+  # generated once at deploy time; there is NO refresh cron. See README.md.
+  lowtide-archive:
+    image: nginx:alpine
+    container_name: lowtide-archive
+    restart: unless-stopped
+    volumes:
+      - ./app/static:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    expose:
+      - "80"
+    networks:
+      - web_external
+      - archive_internal
+
+  # NMDS backend, same image recipe as the live site's (../api/Dockerfile).
+  lowtide-archive-api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: lowtide-archive-api
+    container_name: lowtide-archive-api
+    restart: unless-stopped
+    volumes:
+      - ./app:/app:ro
+    expose:
+      - "5000"
+    networks:
+      - archive_internal
+    # Smaller CPU share than the live api: the archive should never starve it.
+    cpus: 0.5
+    mem_limit: 768m
+
+networks:
+  web_external:
+    external: true
+  archive_internal:

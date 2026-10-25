@@ -27,6 +27,14 @@ www.lowtidedata.org {
     redir https://lowtidedata.org{uri} permanent
 }
 
+# --- archive.lowtidedata.org: frozen archive of low_tide (added 2026-10-24) ---
+# Pinned copy of katmai-mckittrick/low_tide_archive in /opt/lowtide-archive; no
+# refresh cron. DNS: Cloudflare A archive -> 209.38.5.101, grey cloud.
+archive.lowtidedata.org {
+    encode gzip
+    reverse_proxy lowtide-archive:80
+}
+
 :80 {
     encode gzip
 

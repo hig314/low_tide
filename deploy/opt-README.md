@@ -10,6 +10,8 @@ reverse-proxies to apps by their service/container name.
   grey cloud, A records `@` + `www` → 209.38.5.101; `www` 301s to the apex; Caddy
   auto-issues Let's Encrypt TLS). The Reserved IP `http://209.38.5.101/` still works
   as a bare "naked IP" fallback.
+- **low_tide archive** — **https://archive.lowtidedata.org/** (added 2026-10-24): a
+  frozen copy, A record `archive` → 209.38.5.101 (grey cloud), own Caddy block.
 
 The domain has its own Caddy site blocks (:443, HTTP→HTTPS redirect). The two bare
 IPs share Caddy's single `:80` listener; Caddy splits them on the **Host header**
@@ -37,6 +39,12 @@ needed.
   - Deploy-time fix: `cp app/static/Temp_data.js app/static/temp_data.js` (the
     HTML references the lowercase name; Linux is case-sensitive, the dev's Mac
     wasn't). Source files are otherwise untouched.
+- `/opt/lowtide-archive/` — frozen archive of low_tide (since 2026-10-24): same
+  layout, containers `lowtide-archive` + `lowtide-archive-api` (0.5 CPU / 768 MB,
+  network `archive_internal`). `app/` is a pinned commit of
+  github.com/katmai-mckittrick/low_tide_archive; data generated ONCE
+  (`download-once/`), **no cron — by design**. Caddy: `archive.lowtidedata.org` →
+  lowtide-archive:80.
 
 ## HWITW landing page
 Caddy redirects exact root `/` → `/static/hwitw-cesium.html` (the interactive Cesium
