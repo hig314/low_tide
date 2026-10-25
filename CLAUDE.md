@@ -5,12 +5,11 @@ Snapshot for resuming after a break. Last worked: 2026-10-24.
 ## ▶ Where we left off (2026-10-24) — read this first
 
 **New 2026-10-24: archive site live at https://archive.lowtidedata.org** — a
-frozen copy (her fork `katmai-mckittrick/low_tide_archive` @ `303fd0e`, data
+frozen copy (her fork `katmai-mckittrick/low_tide_archive` @ `60274a7`, data
 snapshot 2026-10-24, no cron). Own dir `/opt/lowtide-archive/`, containers
 `lowtide-archive` + `lowtide-archive-api`. See `deploy/archive/README.md`.
-⚠️ In that fork `static/NMDS/low_tide_NMDS.js` was overwritten with a copy of
-`index_NMDS.html`, so **the archive's NMDS page is broken** until she fixes it
-in the fork; then redeploy (recipe in that README) with the new pinned commit.
+Both pages verified in a browser (NMDS graph generates). Updating it = redeploy
+a new pinned fork commit (recipe in that README); never automatic.
 
 ⚠️ **Live data bug found 2026-10-24: the live temp pickle is missing 2026-10-19**
 (every temp since shows one day early). Cause + fix under "Data refresh (cron)";
@@ -37,7 +36,7 @@ Below: the 2026-10-18 snapshot, still accurate otherwise.
    to refresh.sh's download.py call** so manual evening runs can't drop a day.
 1. **Alert on refresh failure.** Failures are still log-only; that's how the
    outage went unnoticed. Top priority.
-2. Notes to send her: archive fork's `low_tide_NMDS.js` is a copy of the HTML; NMDS page hangs after a non-OK response (`low_tide_NMDS.js`
+2. Notes to send her: NMDS page hangs after a non-OK response (`low_tide_NMDS.js`
    `run_graph`); `main/index_lt.html` still loads `../test.js`.
 3. Housekeeping: prune the backups above; optional Cloudflare DNSSEC/CAA.
 
@@ -113,7 +112,9 @@ already public and need no auth.
   `low_tide_archive` pinned at `303fd0e` (deploy-layer files in
   `deploy/archive/`: compose, nginx.conf with the api name changed, README;
   reuses `deploy/api/Dockerfile`). Cloudflare A `archive` → 209.38.5.101 (grey,
-  added by the user); Caddy block added + reloaded (backup
+  added by the user). Same day re-pinned to `60274a7` (her fix: the fork's
+  `low_tide_NMDS.js` had been overwritten with the HTML; static-only rsync,
+  NMDS graph verified in a browser). Caddy block added + reloaded (backup
   `/opt/caddy/Caddyfile.bak-20261024`), cert issued at once. Data: `download.py`
   run once, full temp refetch from 2004 with `TZ=America/Anchorage` (8332
   entries, aligned). No cron — deliberate. Verified: all pages/blobs 200 over

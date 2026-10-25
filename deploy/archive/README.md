@@ -3,7 +3,7 @@
 A frozen, stable copy of the site, unaffected by ongoing work on the live one.
 
 - **Source:** `github.com/katmai-mckittrick/low_tide_archive` (her fork of this
-  repo), **pinned** to one commit — currently `303fd0e`. Updating the archive
+  repo), **pinned** to one commit — currently `60274a7` (was `303fd0e`, whose NMDS JS was a copy of the HTML). Updating the archive
   is a deliberate redeploy, never automatic.
 - **Data:** generated **once** at deploy time by running her `download.py`; no
   refresh cron (she deleted `refresh.sh` in the fork, and nothing in the app
