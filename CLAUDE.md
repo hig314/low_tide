@@ -1,49 +1,55 @@
 # low_tide — project state
 
-Snapshot for resuming after a break. Last worked: 2026-10-24.
+Snapshot for resuming after a break. Last worked: 2026-10-25.
 
-## ▶ Where we left off (2026-10-24) — read this first
+## ▶ Where we left off (2026-10-25) — read this first
 
-**New 2026-10-24: archive site live at https://archive.lowtidedata.org** — a
-frozen copy (her fork `katmai-mckittrick/low_tide_archive` @ `60274a7`, data
-snapshot 2026-10-24, no cron). Own dir `/opt/lowtide-archive/`, containers
-`lowtide-archive` + `lowtide-archive-api`. See `deploy/archive/README.md`.
-Both pages verified in a browser (NMDS graph generates). Updating it = redeploy
-a new pinned fork commit (recipe in that README); never automatic.
+**Everything is deployed, verified and committed. Nothing is mid-flight.**
+One known live-data bug is waiting on the user's go-ahead (open item 0).
 
-⚠️ **Live data bug found 2026-10-24: the live temp pickle is missing 2026-10-19**
-(every temp since shows one day early). Cause + fix under "Data refresh (cron)";
-not yet repaired on the live site.
-
-Below: the 2026-10-18 snapshot, still accurate otherwise.
-
-- **Live:** https://lowtidedata.org — main page + new NMDS page, both verified in a
-  browser. Containers `lowtide` (nginx) + `lowtide-api` (NMDS backend, new today)
-  up; HWITW + Caddy untouched.
-- **Code deployed:** her `main` through `f330cf7` (all her pushes to date).
-  Deploy-layer: `deploy/api/Dockerfile`, compose + `nginx.conf` changes (commit
-  `9af6673`). Our PR #1 (`requirements.txt`) merged by her.
-- **Data current:** refresh fixed (her `d807c91`) after a 6-week silent outage;
-  temp history fully refetched from NOAA (corrected 2026 summer). Last refresh
-  succeeded 2026-10-19 03:00 UTC; the 4 AM Anchorage cron continues daily.
-- **Repo:** `main` clean and in sync with GitHub at `5a1bb31`; no open PRs or branches.
+- **Live:** https://lowtidedata.org — main + NMDS pages (verified in a browser
+  2026-10-18). Containers `lowtide` + `lowtide-api`.
+- **Archive (new 2026-10-24):** https://archive.lowtidedata.org — frozen copy of
+  her fork `katmai-mckittrick/low_tide_archive`, **pinned at `60274a7`**; data
+  snapshot 2026-10-24 (temps through 10-24, aligned, incl. 10-19); **no cron, by
+  design**. `/opt/lowtide-archive/`, containers `lowtide-archive` +
+  `lowtide-archive-api`. Both pages verified in a browser (NMDS graph: 202 points,
+  ~2.5 s). Updates are deliberate re-pins only — recipe in
+  `deploy/archive/README.md`. Fork's newer `47355ae` is README-only: nothing to deploy.
+- **HWITW + Caddy:** up; Caddy gained the `archive` block (backup
+  `/opt/caddy/Caddyfile.bak-20261024`).
+- **Code deployed (live):** her `main` through `f330cf7`; her later `15ae42a` is
+  README-only (not deployed — README isn't in `deploy/app/`).
+- **Data (live):** daily cron healthy — last run 2026-10-25 12:00 UTC, success,
+  5/5 blobs. ⚠️ But the live temp pickle is **missing 2026-10-19**, so every
+  temperature since shows one day early (item 0).
+- **Droplet:** 6 containers up, ~1.2 GB RAM available, 37 GB disk free (2026-10-25).
+- **Repo:** `main` clean and in sync with GitHub at `80406d9`; no open PRs or
+  branches. Local remote `archive` = her fork (for re-pins).
 - **Rollback / backups on the droplet** (prune once things have run clean for a
   while): `/opt/lowtide/{docker-compose.yml,nginx.conf}.bak-20261018`,
-  `/opt/lowtide/refresh/work/Temp_data.pre-fix-20261018` and `.pre-refetch-20261018`.
+  `/opt/lowtide/refresh/work/Temp_data.pre-fix-20261018` and `.pre-refetch-20261018`,
+  `/opt/caddy/Caddyfile.bak-20261024`.
 
 **Open items** — details in "Possible follow-ups":
-0. **Repair the live temp pickle (missing 2026-10-19) and add `TZ=America/Anchorage`
-   to refresh.sh's download.py call** so manual evening runs can't drop a day.
+0. **Live temp pickle missing 2026-10-19 — fix offered, awaiting the user's OK.**
+   Plan (~5 min): add `TZ=America/Anchorage` to refresh.sh's download.py call,
+   then full staged refetch of the live pickle (backup first; expect only the
+   positions after 10-18 to change), run refresh.sh, verify. Cause under
+   "Data refresh (cron)" → "Day-drop bug". Until fixed, any manual refresh must
+   run with `TZ=America/Anchorage` in front.
 1. **Alert on refresh failure.** Failures are still log-only; that's how the
-   outage went unnoticed. Top priority.
+   outage went unnoticed.
 2. Notes to send her: NMDS page hangs after a non-OK response (`low_tide_NMDS.js`
    `run_graph`); `main/index_lt.html` still loads `../test.js`.
 3. Housekeeping: prune the backups above; optional Cloudflare DNSSEC/CAA.
 
 **First thing on restart:** `ssh root@164.92.75.176 'docker ps; tail -3
-/opt/lowtide/refresh/refresh.log'` (expect 6 containers up — incl. the 2 archive ones — and
-`refresh end (success)`), then `git fetch && git log --oneline main..origin/main`
-for new handoffs.
+/opt/lowtide/refresh/refresh.log'` (expect 6 containers up — incl. the 2 archive
+ones — and `refresh end (success)`), then `git fetch origin archive` and
+`git log --oneline main..origin/main` (live handoffs) +
+`git log --oneline 60274a7..archive/main` (archive changes; deploy only on request).
+SSH is `ufw limit`ed (6 connections / 30 s): batch commands into few ssh calls.
 
 ## What this is
 
@@ -163,7 +169,8 @@ already public and need no auth.
   NMDS page at `/static/NMDS/index_NMDS.html`. The Reserved IP http://209.38.5.101/ still works as a
   bare-IP HTTP fallback — old links don't break.
 - **NMDS backend:** container `lowtide-api`, reached only via nginx at `/requests/`.
-- **Data:** refreshing daily again (fixed 2026-10-18); temps through 2026-10-18.
+- **Data:** refreshing daily (fixed 2026-10-18); temps current, but 2026-10-19 missing (see open item 0).
+- **Archive:** https://archive.lowtidedata.org — frozen, no cron (see `deploy/archive/README.md`).
 - **HWITW:**    http://164.92.75.176/ (droplet's primary IP — untouched, still working)
 
 All containers are `restart: unless-stopped` and the Reserved IP is permanently
