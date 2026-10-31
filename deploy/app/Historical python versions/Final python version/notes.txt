@@ -1,0 +1,3 @@
+smoothing: Weighted running average
+Percent of selected done after smoothing (relevant for days with no observations)
+Percent done before smoothing
