@@ -18,8 +18,9 @@ One known live-data bug is waiting on the user's go-ahead (open item 0).
   `deploy/archive/README.md`. Fork's newer `47355ae` is README-only: nothing to deploy.
 - **HWITW + Caddy:** up; Caddy gained the `archive` block (backup
   `/opt/caddy/Caddyfile.bak-20261024`).
-- **Code deployed (live):** her `main` through `f330cf7`; her later `15ae42a` is
-  README-only (not deployed — README isn't in `deploy/app/`).
+- **Code deployed (live):** her `main` through `2950716` (2026-10-31: byline
+  "By Katmai McKittrick" in both `info.html`, static-only rsync + SOP refresh run
+  with `TZ=America/Anchorage`). `15ae42a` is README-only (not in `deploy/app/`).
 - **Data (live):** daily cron healthy — last run 2026-10-25 12:00 UTC, success,
   5/5 blobs. ⚠️ But the live temp pickle is **missing 2026-10-19**, so every
   temperature since shows one day early (item 0).
