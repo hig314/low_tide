@@ -1,11 +1,22 @@
 # low_tide — project state
 
-Snapshot for resuming after a break. Last worked: 2026-10-25.
+Snapshot for resuming after a break. Last worked: 2026-11-02.
 
-## ▶ Where we left off (2026-10-25) — read this first
+## ▶ Where we left off (2026-11-02) — read this first
 
 **Everything is deployed, verified and committed. Nothing is mid-flight.**
 One known live-data bug is waiting on the user's go-ahead (open item 0).
+
+New since 2026-10-25:
+- **Katmai has root SSH** (2026-11-02), so she can deploy herself; her first login
+  was **not yet confirmed**. See "Infrastructure". She may deploy without us:
+  on restart, check what's live rather than trusting the "Code deployed" line.
+- **Security review done 2026-11-02;** the user decided the arrangement is
+  sufficient for now. Remaining notes are in Claude's private memory, deliberately
+  not in this public repo. Don't redo the review unless asked.
+- **Her local dev page calls the live NMDS backend** (`lowtide-api` log, 10-31 and
+  11-01, referer `http://192.168.194.103:5001/`, plus a 404 on `/requests/upload`).
+  Presumably Katmai testing a new upload feature; not confirmed with her.
 
 - **Live:** https://lowtidedata.org — main + NMDS pages (verified in a browser
   2026-10-18). Containers `lowtide` + `lowtide-api`.
@@ -21,12 +32,17 @@ One known live-data bug is waiting on the user's go-ahead (open item 0).
 - **Code deployed (live):** her `main` through `2950716` (2026-10-31: byline
   "By Katmai McKittrick" in both `info.html`, static-only rsync + SOP refresh run
   with `TZ=America/Anchorage`). `15ae42a` is README-only (not in `deploy/app/`).
-- **Data (live):** daily cron healthy — last run 2026-10-25 12:00 UTC, success,
+  Her later `a01d159`..`d6da9d7` (2026-10-31) are not deployed and don't need to
+  be: README plus a new `deploy/app/Historical python versions/` archive, nothing
+  under `static/`. The next rsync will copy that folder to the droplet (~6,500 lines
+  plus binaries; outside the nginx root, so not served).
+- **Data (live):** daily cron healthy — last run 2026-11-02 13:00 UTC, success,
   5/5 blobs. ⚠️ But the live temp pickle is **missing 2026-10-19**, so every
   temperature since shows one day early (item 0).
-- **Droplet:** 6 containers up, ~1.2 GB RAM available, 37 GB disk free (2026-10-25).
-- **Repo:** `main` clean and in sync with GitHub at `80406d9`; no open PRs or
-  branches. Local remote `archive` = her fork (for re-pins).
+- **Droplet:** 6 containers up, ~1.1 GB RAM available, 37 GB disk free (2026-11-02).
+- **Repo:** `main` in sync with GitHub; no open PRs or branches. Local remote
+  `archive` = her fork (for re-pins). Note `git fetch origin archive` is wrong
+  (treats `archive` as a ref); use `git fetch --multiple origin archive`.
 - **Rollback / backups on the droplet** (prune once things have run clean for a
   while): `/opt/lowtide/{docker-compose.yml,nginx.conf}.bak-20261018`,
   `/opt/lowtide/refresh/work/Temp_data.pre-fix-20261018` and `.pre-refetch-20261018`,
@@ -38,7 +54,8 @@ One known live-data bug is waiting on the user's go-ahead (open item 0).
    then full staged refetch of the live pickle (backup first; expect only the
    positions after 10-18 to change), run refresh.sh, verify. Cause under
    "Data refresh (cron)" → "Day-drop bug". Until fixed, any manual refresh must
-   run with `TZ=America/Anchorage` in front.
+   run with `TZ=America/Anchorage` in front. More pressing now that Katmai can
+   deploy: she needs to know this rule, or the fix should land first.
 1. **Alert on refresh failure.** Failures are still log-only; that's how the
    outage went unnoticed.
 2. Notes to send her: NMDS page hangs after a non-OK response (`low_tide_NMDS.js`
@@ -47,7 +64,7 @@ One known live-data bug is waiting on the user's go-ahead (open item 0).
 
 **First thing on restart:** `ssh root@164.92.75.176 'docker ps; tail -3
 /opt/lowtide/refresh/refresh.log'` (expect 6 containers up — incl. the 2 archive
-ones — and `refresh end (success)`), then `git fetch origin archive` and
+ones — and `refresh end (success)`), then `git fetch --multiple origin archive` and
 `git log --oneline main..origin/main` (live handoffs) +
 `git log --oneline 60274a7..archive/main` (archive changes; deploy only on request).
 SSH is `ufw limit`ed (6 connections / 30 s): batch commands into few ssh calls.
@@ -114,6 +131,12 @@ sensitive in any of its 17 commits. The data sources (Google Sheets, NOAA) are
 already public and need no auth.
 
 ## Change log (deploy-layer sessions, newest first)
+
+- **2026-11-02 — Katmai root SSH.** Her ed25519 key appended to
+  `/root/.ssh/authorized_keys` so she can deploy. No limited account created.
+  Security review the same day; the user judged the arrangement sufficient for now.
+- **2026-10-31 — byline deploy.** Her `f55a426` + `2950716` ("By Katmai McKittrick"
+  in both `info.html`): static-only rsync + SOP refresh, verified live.
 
 - **2026-10-24 — archive site.** https://archive.lowtidedata.org: her fork
   `low_tide_archive` pinned at `303fd0e` (deploy-layer files in
@@ -214,6 +237,9 @@ assigned, so everything survives a droplet reboot. Safe to walk away.
 
 DigitalOcean account `hig314@gmail.com`, `doctl` is authenticated locally.
 SSH: `ssh root@164.92.75.176` (local `~/.ssh/id_rsa`, key "macbook" on the account).
+Katmai also has root SSH since 2026-11-02, so she can deploy: her own ed25519 key,
+labelled `katmai` in `/root/.ssh/authorized_keys` (fingerprint `SHA256:QmdIPM3Z...`).
+Revoke by deleting that line. Backup: `authorized_keys.bak-20261102`.
 
 - Droplet **hwitw** (id `574919305`), sfo3, 2GB/1vCPU/50GB, Ubuntu+Docker. ~1.3GB
   RAM available, 38GB disk free (2026-10-18, after adding `lowtide-api`).
@@ -312,6 +338,19 @@ is applied into `deploy/app/` and committed, so her versions diff cleanly.
     # After editing it:  validate, then reload (no container restart needed).
     ssh root@164.92.75.176 'cd /opt/caddy && docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile \
       && docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile'
+
+## Where to look when something's wrong
+
+No alerts exist; nothing tells us about a failure unless someone looks.
+- Stale/wrong data: `/opt/lowtide/refresh/refresh.log`. Cron firing:
+  `journalctl -u cron --since "-2 days" | grep refresh`.
+- Page errors: `docker logs lowtide`. NMDS: `docker logs lowtide-api` (shows nginx's
+  IP, not the visitor's; match by time). Site/certs: `docker logs caddy` (no normal
+  requests logged). Archive: `lowtide-archive`, `lowtide-archive-api`.
+- SSH/server: `/var/log/ufw.log`, `auth.log`, `syslog`.
+- Caveats: `success` + `5/5` doesn't prove temps updated (a NOAA outage is
+  skipped silently); misalignment never logs; `--force-recreate` deploys erase
+  `docker logs` history; container logs have no size limit (small so far).
 
 ## Data refresh (cron)
 
