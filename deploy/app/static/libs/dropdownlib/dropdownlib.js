@@ -22,7 +22,8 @@ class MultiselectDropdown {
 		this.select = makeNewElement(this.button_div,'select',{'class':'header-button'})
 		this.header = makeNewElement(this.select,'option',{'class':'header-button'},label)
 		this.over_select = makeNewElement(this.button_div,'div',{'class':'overSelect'})
-		this.menu = makeNewElement(this.container,'div',{'style':"display: none;",'class':'menu'})
+		let menu_container = makeNewElement(this.container,'div',{'class':'menu-container'})
+		this.menu = makeNewElement(menu_container,'div',{'style':"display: none;",'class':'menu'})
 		
 		this.listener = listener
 		this.auto_close = auto_close
@@ -114,7 +115,6 @@ class MultiselectDropdown {
 		}
 	}
 	get(){
-		console.log(this)
 		return this.selected.slice()
 	}
 	updateLabel(label){
@@ -209,7 +209,15 @@ class BetterDropdown {
 		}
 	}
 	set(val,run_event=false){
-		this.selected = val
+		if (this.names.includes(val)){
+			this.selected = val
+			for (let i = 0; i < this.checkboxes.length; i++){
+				this.checkboxes[i].checked = false;
+			}
+			this.checkboxes[this.names.indexOf(val)].checked = true;
+		}
+		
+		
 		if (run_event && this.listener){
 			this.listener(this.selected)
 		}
