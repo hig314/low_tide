@@ -13,15 +13,6 @@
 //COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 //OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-// custom_files_loc = 'customs';
-// try:
-//     file = open(custom_files_loc, 'rb');
-//     custom_files = pickle.load(file);
-//     file.close();
-// except (FileNotFoundError,EOFError):
-//     custom_files = {};
-var seldovia_custom_files = {}
-var costal_studies_custom_files = {}
 var custom_files = seldovia_custom_files
 function generate_custom_file(file_data,name) {
 	console.log(file_data)
@@ -159,6 +150,35 @@ function get_colors(filename) {
     }
     color_dict['biodiversity'] = '#000';
     return color_dict;
+}
+
+function get_types(filename) {
+    if( Object.keys(custom_files).includes(filename) ) {
+        let types = {};
+        for( let speices of custom_files[filename] ) {
+            types[speices[0]] = speices[2][0];
+        }
+		types['biodiversity'] = 'B';
+        return types;
+    }
+	let column = get_columns()
+    let name_column = invert_grid(raw_data.slice())[column.indexOf('common name')];
+    let info_column = invert_grid(raw_data.slice())[column.indexOf('data analasys info')];
+    let names = get_names(filename);
+    let types = {};
+    for( let [ i,info ] of info_column.entries()) {
+		let name = undefined
+        if( info.split('$').length === 4 ) {
+            name = name_column[i];
+        } else {
+            name = info.split('$')[0];
+        }
+        if( names.includes(name) ) {
+            types[name] = info.split('$').at(-1)[0];
+        }
+    }
+	types['biodiversity'] = 'B';
+    return types;
 }
 
 function get_groups(filename) {
