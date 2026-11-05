@@ -101,39 +101,87 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
     <label id=mouseover1></label>
     <label id=mouseover2></label>
   </div>
-  <div id="page-overlay" class="overlay hidden" style="z-index: 996;"></div>
-  <div id=custom class="popup hidden" style="display: flex; flex-direction: column; gap: 10px; background-color: #f2f2f2; border-radius: 5px; border: 1px solid #bbb; box-shadow: 0 0 8px rgba(0, 0, 0, 0.15); padding: 3px 5px; align-items: center; z-index: 997;">
+  <div id="page-overlay0" class="overlay hidden" style="z-index: 992;"></div>
+  <div id=details class="popup hidden" style="display: flex; flex-direction: column; gap: 10px; background-color: #f2f2f2; border-radius: 5px; border: 1px solid #bbb; box-shadow: 0 0 8px rgba(0, 0, 0, 0.15); padding: 3px 5px; align-items: center; z-index: 993;">
+    <label id=details0></label>
+    <label id=details1></label>
+    <label id=details2></label>
+	<div id=details3 style="display: flex; flex-direction: column; gap: 10px;">></div>
+  </div>
+  <div id="page-overlay1" class="overlay hidden" style="z-index: 994;"></div>
+  <div id=custom class="popup hidden" style="display: flex; flex-direction: column; gap: 10px; background-color: #f2f2f2; border-radius: 5px; border: 1px solid #bbb; box-shadow: 0 0 8px rgba(0, 0, 0, 0.15); padding: 3px 5px; align-items: center; z-index: 995;">
 	<div id="custom_speiceis" class='grid5'></div>
-	<button id="new_group" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px; flex: none; " >Add new group</button>
+	<div style="display: flex; flex-direction: row; gap: 4px; align-items: center;">
+	  <button id="new_group" type="button" style="display: inline-block; margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px; flex: none; " >Add new group</button>
+	  <button id=group_info_btn class="info" style="display: inline-block; position: relative; top: 0px;" target="_blank" rel="noopener noreferrer">?</button>
+	</div>
 	<div style="display: flex; flex-direction: row; gap: 30px; align-items: center;">
 	  <button id="customs_deselect" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px;" >Deselect all</button>
 	  <button id="customs_select" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px;" >Select all</button>
 	</div>
 	<select id=customs_file_select></select>
 	<input type="text" id="name" placeholder="Name">
-	<button id="submit" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px; flex: none; " >Submit</button>
+	<div style="display: flex; flex-direction: row; gap: 10px; align-items: center;">
+  	  <button id="cancel" type="button" class="button" >Cancel</button>
+  	  <button id="submit" type="button" class="button" >Submit</button>
+	</div>
   </div>
   
-  <div id="page-overlay2" class="overlay hidden" style="z-index: 998;"></div>
-  <div id=group_name class="popup hidden" style="display: flex; flex-direction: column; gap: 10px; background-color: #f2f2f2; border-radius: 5px; border: 1px solid #bbb; box-shadow: 0 0 8px rgba(0, 0, 0, 0.15); padding: 3px 5px; align-items: center; z-index: 999;">
+  <div id="page-overlay2" class="overlay hidden" style="z-index: 996;"></div>
+  <div id=group_name class="popup hidden" style="display: flex; flex-direction: column; gap: 10px; background-color: #f2f2f2; border-radius: 5px; border: 1px solid #bbb; box-shadow: 0 0 8px rgba(0, 0, 0, 0.15); padding: 3px 5px; align-items: center; z-index: 997;">
 	<input  id="group_name_enter" type="text" placeholder="Name">
 	<button id="group_submit" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px; flex: none; " >Submit</button>
   </div>
   
+  <div id="page-overlay3" class="overlay hidden" style="z-index: 996;"></div>
+  <div id=group_info class="popup hidden" style="display: flex; flex-direction: column; gap: 10px; background-color: #f2f2f2; border-radius: 5px; border: 1px solid #bbb; box-shadow: 0 0 8px rgba(0, 0, 0, 0.15); padding: 3px 5px; align-items: center; z-index: 997;">
+	<div>
+		Groups can be used to combine multiple species in the visualization. The text field on the right for each species is that species group string, If the group string is ‘G’ the species shows up normally, otherwise it must be in the form of ‘&lt;letter&gt;&lt;number&gt;’<br>
+		<br>
+		The number is the group and the letter is what the species is in the visualization. The possible letters are:<br>
+		O: does not show up in the visualization<br>
+		I: shows up normally in the visualization<br>
+		S: shows up as the total number of individuals observed within the group<br>
+		A: shows up the same as S but divided by the number of species in the group (the species with ‘A’ is not included in the division)<br>
+		B: the number of species in the group we saw at least one of<br>
+		Only one species within any given group may be A, S, or B<br>
+		<br>
+		Within a group the species with A, S, or B should usually be one added with the ‘Add new group’ button. This adds a new ‘species’ with all the data points as 0.<br>
+		
+	</div>
+  </div>
+  
   
   <div style="display: inline-block;">
-    <a id=redirect class="button" style="display: inline-block;">Go to main</a>
+    <button id=redirect type="button" class="button" style="background-color: #e3ffe3;">Go to main</button>
 	<div style="display: inline-block;">
       <h1 style="margin-left: 550px; font-family: Helvetica; font-size: 20px;">Kachemak Bay intertidal data analysis tool - NMDS</h1>
 	</div>
-	<a id=info class="info" style="display: inline-block; position: relative; top: -3px;">?</a>
+	<a id=info class="info" style="display: inline-block; position: relative; top: -3px;" target="_blank" rel="noopener noreferrer">?</a>
   </div>
   
   
   <div style="display: flex; gap: 30px; align-items: flex-start; flex-direction: row;">
     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+	  <label style="margin-left: 0px;">Dataset selection</label>
 	  <select id=area_select><option>Seldovia</option><option>Coastal studies</option></select>
 	  <select id=file_select></select>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+	  <label style="margin-left: 0px;">Species selection</label>
+	  <div id=speicies_select></div>
+	  <div style="display: flex; flex-direction: row; gap: 10px; align-items: center;">
+		<button id="deselect" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px;" >Deselect all</button>
+		<button id="select" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px;" >Select all</button>
+	  </div>
+	  <div id=category_select></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+	  <label style="margin-left: 0px;">Location selection</label>
+	  <div id=location_select>
+	  </div>
+	  <button id="no_locations" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px;" >No locations</button>
+	  <button id="all_locations" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px;" >All locations</button>
     </div>
     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
 	  <p style="margin: 0;">Date range</p>
@@ -141,7 +189,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 		  <div id=date_slider style="width: 100px;"></div>
 	  </div>
     </div>
-    <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-left: 10px; align-items: center;">
 	  <p style="margin: 0;">Tide range</p>
 	  <div id=tide_slider_holder>
 		  <div id=tide_slider style="width: 100px;"></div>
@@ -153,26 +201,17 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 	  <label id=mouseover2></label>
     </div> -->
     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-left: 10px; margin-right: -10px;">
-		<div id=options_select></div>
+	  <br>
+	  <div id=options_select></div>
+	  <label id=surveys style="margin-left: 0px;"></label>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-left: 10px; margin-right: -10px;">
+		<label style="margin-left: 0px;">NMDS options</label>
 		<div id=shapes_select></div>
 		<div id=colors_select></div>
-	    <label id=surveys style="margin-left: 0px;"></label>
     </div>
     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
-	  <div id=speicies_select></div>
-	  <div style="display: flex; flex-direction: row; gap: 10px; align-items: center;">
-		<button id="deselect" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px;" >Deselect all</button>
-		<button id="select" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px;" >Select all</button>
-	  </div>
-	  <div id=category_select></div>
-    </div>
-    <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
-	  <div id=location_select>
-	  </div>
-	  <button id="no_locations" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px;" >No locations</button>
-	  <button id="all_locations" type="button" style="margin-left: 0px; background-color: #fff; border-width: thin; border-radius: 2px;" >All locations</button>
-    </div>
-    <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+	  <label style="margin-left: 0px;">Data transformation settings</label>
 	  <select id=visualization>
 		  <option>Numbers</option>
 		  <option>Percent</option>
@@ -199,6 +238,8 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
     <div id=canvas style="display: inline-block; padding-top: 9px; display: flex; flex-direction: column; align-items: center;" title=""></div>
     <div id=error style="text-align: center; color: red; font-family: Helvetica; font-size: 20px; font-weight: bold;"></div>
   </div>
+  <br/>
+  <br/>
   
   <link href="../libs/utils.css" rel="stylesheet">
   <script src="../libs/utils.js"></script>
@@ -211,6 +252,8 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
   <script src="../costal_studies_sheet.js"></script>
   <script src="../seldovia_locations.js"></script>
   <script src="../costal_studies_locations.js"></script>
+  <script src="../seldovia_customs.js"></script>
+  <script src="../costal_studies_customs.js"></script>
   <script src="../temp_data.js"></script>
   
   <script src="../file_initalization.js"></script>
