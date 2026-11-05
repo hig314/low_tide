@@ -103,9 +103,43 @@ def update_data(end_date):
         file.close()
         if redo:
             update_data(save_end)
+        else:
+            fix_data()
         
     else:
         print(f"Failed to fetch data. Status code: {response.status_code}")
         return
 
-
+def fix_data():
+    file = open("Temp_data", 'rb')
+    Temp_data,start_date = pickle.load(file)
+    file.close()
+    print((datetime.datetime.strptime(Temp_data[-1]['date'],'%Y-%m-%d')-datetime.datetime.strptime(Temp_data[0]['date'],'%Y-%m-%d')).days,len(Temp_data))
+    dev = 0
+    c = 1
+    changed = False
+    pre = Temp_data[0]['date']
+    for i in range(1,len(Temp_data)):
+        cur = Temp_data[i+dev]['date']
+        if pre == cur:
+            c += 1
+        else:
+            d = (datetime.datetime.strptime(cur,'%Y-%m-%d')-datetime.datetime.strptime(pre,'%Y-%m-%d')).days
+            if d < c:
+                print(f'Removed {Temp_data[i+dev-c]} {c-d} times')
+                for j in range(c-d):
+                    Temp_data.pop(i+dev-c)
+                
+            elif d > c:
+                print(f'Addeed {Temp_data[i+dev-1]} {d-c} times')
+                for j in range(d-c):
+                    Temp_data.insert(i+dev,Temp_data[i+dev-1])
+                changed = True
+            dev += d-c
+            pre = cur
+            c = 1
+    print((datetime.datetime.strptime(Temp_data[-1]['date'],'%Y-%m-%d')-datetime.datetime.strptime(Temp_data[0]['date'],'%Y-%m-%d')).days,len(Temp_data))
+    file = open("Temp_data", 'wb')
+    pickle.dump((Temp_data,start_date), file)
+    file.close()
+            
