@@ -14,32 +14,38 @@ WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEM
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 '''
-'''
-def lzw_encode(s) {
+
+def lzw_encode(s):
     tdict = {}
-    data = (str(s)).split("")
+    data = list(str(s))
+    print(data)
     out = []
-    currChar
     phrase = data[0]
     code = 256
-    for (i=1 i<data.length i++) {
+    for i in range(1,len(data)):
         currChar=data[i]
-        if (tdict[phrase + currChar] != null) {
+        if phrase + currChar in tdict and tdict[phrase + currChar]:
             phrase += currChar
-        }
-        else {
-            out.push(phrase.length > 1 ? tdict[phrase] : phrase.charCodeAt(0))
+        
+        else:
+            if len(phrase) > 1:
+                out.append(tdict[phrase])
+            else:
+                out.append(ord(phrase))
             tdict[phrase + currChar] = code
-            code++
+            code += 1
             phrase=currChar
-        }
-    }
-    out.push(phrase.length > 1 ? tdict[phrase] : phrase.charCodeAt(0))
-    for (i=0 i<out.length i++) {
-        out[i] = String.fromCharCode(out[i])
-    }
-    return out.join("")
-}'''
+        
+    
+    if len(phrase) > 1:
+        out.append(tdict[phrase])
+    else:
+        out.append(ord(phrase))
+    for i in range(len(out)):
+        out[i] = chr(out[i])
+    
+    return "".join(out)
+
 
 def lzw_decode(s):
     tdict = {}
