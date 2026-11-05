@@ -13,6 +13,10 @@
 //COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 //OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+if (window.self === window.top){
+	window.location.replace(`${window.location.protocol}//${window.location.host}/static/hub/index_hub.html?path=${window.location.pathname}`);
+}
+
 var raw_data = []
 var location_data = []
 var do_notes = true
@@ -31,6 +35,7 @@ function presence_absence(val,display,is_presence_absence) {
 
  class SelectionFrame {
 	 constructor(master) {
+		console.log('SelectionFrame')
         this.colors = {};
         this.groups = {};
 		this.master = master
@@ -40,10 +45,22 @@ function presence_absence(val,display,is_presence_absence) {
 		
 		this.submit_button = document.getElementById('submit')
 		this.submit_button.addEventListener("click", () => this.submit());
+		
+		this.cancel_button = document.getElementById('cancel')
+		this.cancel_button.addEventListener("click", () => this.cancel());
+		
+		document.getElementById('group_info_btn').addEventListener("click", () => {
+			document.getElementById('page-overlay3').classList.remove('hidden')
+			document.getElementById('group_info').classList.remove('hidden')
+		});
+		document.getElementById('page-overlay3').addEventListener("click", () => {
+			document.getElementById('page-overlay3').classList.add('hidden')
+			document.getElementById('group_info').classList.add('hidden')
+		});
     }
 	activate() {
 		document.getElementById('custom').classList.remove('hidden');
-		document.getElementById('page-overlay').classList.remove('hidden');
+		document.getElementById('page-overlay1').classList.remove('hidden');
         this.files = get_filenames();
         this.colors = {};
         this.groups = {};
@@ -67,7 +84,6 @@ function presence_absence(val,display,is_presence_absence) {
 
     select_file(file) {
         let selected = this.speicies.get_selected();
-		console.log(selected)
         for( let species of Object.keys(selected[0]) ) {
             this.selected[this.file][species] = [+selected[0][species].checked,selected[1][species].value,selected[2][species].value,selected[3][species]];
         }
@@ -81,15 +97,28 @@ function presence_absence(val,display,is_presence_absence) {
         for( let species of Object.keys(selected[0]) ) {
             this.selected[this.file][species] = [+selected[0][species].checked,selected[1][species].value,selected[2][species].value,selected[3][species]];
         }
-		console.log('sdf')
         generate_custom_file(this.selected,document.getElementById('name').value);
 		document.getElementById('custom').classList.add('hidden');
-		document.getElementById('page-overlay').classList.add('hidden');
+		document.getElementById('page-overlay1').classList.add('hidden');
 		this.speicies.clear()
 		this.speicies = null
 		document.getElementById('name').value = ''
 		this.master.select_custom()
 		
+    }
+	
+    cancel() {
+        let selected = this.speicies.get_selected();
+        for( let species of Object.keys(selected[0]) ) {
+            this.selected[this.file][species] = [+selected[0][species].checked,selected[1][species].value,selected[2][species].value,selected[3][species]];
+        }
+        generate_custom_file(this.selected,document.getElementById('name').value);
+		document.getElementById('custom').classList.add('hidden');
+		document.getElementById('page-overlay1').classList.add('hidden');
+		this.speicies.clear()
+		this.speicies = null
+		document.getElementById('name').value = ''
+		this.master.cancel_custom()
     }
 
 }
@@ -118,6 +147,9 @@ class SpeiciesFrame {
 			this.color_buttons[name].addEventListener("click", () => this.update_prevew(name));
 								
             let group = makeNewElement(elem,'input',{'type':'text','maxlength':4,'size':4});
+			group.addEventListener('focus', () => {
+				group.select()
+			});
             group.value = selected[name][2];
             this.group_inputs[name] = group;
             if (selected[name].length > 3) {
@@ -142,7 +174,22 @@ class SpeiciesFrame {
 		
         this.group_submit_button = document.getElementById('group_submit');
 		this.group_submit_button.addEventListener("click", () => this.add_group());
+		document.addEventListener('keydown', (event) => this.keypress(event));
     }
+	
+	keypress(event){
+		var key = event.keyCode || event.charCode;
+		if (key === 38 || key === 40){
+			if (document.activeElement.nodeName === 'INPUT'){
+				event.preventDefault();
+			}
+			
+			let ind = Object.values(this.group_inputs).indexOf(document.activeElement)
+			let n_ind = ind+key-39
+			if (ind !== -1 && n_ind > -1 && n_ind < Object.values(this.group_inputs).length)
+			Object.values(this.group_inputs)[ind+key-39].focus()
+		}
+	}
 
     set_speicies(set_type) {
         for( let checkbutton of Object.values(this.checkboxes) ) {
@@ -201,7 +248,6 @@ class SpeiciesFrame {
     }
 
     update_prevew(name){
-		console.log(this.color_inputs[name].value)
         this.color_buttons[name].style.color = this.color_inputs[name].value;
     }
 	
@@ -216,19 +262,20 @@ class SpeiciesFrame {
 }
 class CrabVisualizationFrameRoot {
 	
-	constructor(inital_data=null) {
+	constructor(inital_data,area) {
         this.has_canvas = false;
         this.is_active = false;
         this.is_redrawing = true;
 		this.params = {}
 		this.handler = this.run_canvas
+		console.log(inital_data)
 		
-		document.onkeydown = (event) => this.keypress(event)
+		window.addEventListener('keydown', (event) => this.keypress(event));
 		if (document.getElementById('area_select')){
 	        if( inital_data === null ) {
-	            this.data_cat = 'Seldovia';
+	            this.data_cat = area;
 	        } else {
-	            this.data_cat = inital_data['data_cat'];
+	            this.data_cat = inital_data['area'];
 	        }
 			if (this.data_cat === 'Seldovia') {
 				raw_data = seldovia_raw_data
@@ -236,28 +283,36 @@ class CrabVisualizationFrameRoot {
 				custom_files = seldovia_custom_files
 				location_data = get_loc_data(seldovia_location_data)
 			} else if (this.data_cat === 'Coastal studies') {
+				document.getElementById('visualization').disabled = true
+				document.getElementById('scaling').disabled = true
 				raw_data = costal_studies_raw_data
 				do_notes = false
 				custom_files = costal_studies_custom_files
 				location_data = get_loc_data(costal_studies_location_data)
 			}
-			console.log(location_data)
 			document.getElementById('area_select').addEventListener('change', (event) => this.select_area(event.target.value));
 			var files = get_filenames()
 			this.files = files
         	this.data_menu = document.getElementById('area_select')
+			for (let option of this.data_menu.options){
+				if (option.value === this.data_cat){
+					this.data_menu.value = this.data_cat
+					break;
+				}
+			}
+			this.params['area'] = this.data_menu
 		}
         
 		if (document.getElementById('file_select')){
 	        if ( inital_data === null ) {
 	            var file = 0;
 			} else {
-	            var file = inital_data['file'];
+	            var file = files.indexOf(inital_data['file']);
 	        }
-
+			this.file_save = file
 	        let [data, categories] = cleanup(get_file(files[file]));
 			this.data = data
-	        this.file = {"display_name":files[file],'color_dict':get_colors(files[file]),'sci_names':get_scientific_names(files[file])};
+	        this.file = {"display_name":files[file],'color_dict':get_colors(files[file]),'type_dict':get_types(files[file]),'sci_names':get_scientific_names(files[file])};
 	        this.crabs = Object.keys(Object.values(this.data)[0][0]['crabs']);
 		
 			this.categorie_list = [...new Set(categories.slice().flat())]
@@ -275,21 +330,31 @@ class CrabVisualizationFrameRoot {
 		
 	        this.selected_file = this.file["display_name"];
 	        this.file_menu = document.getElementById('file_select')
-	        for(let i = 0; i < files.length; i++) {
+	        for (let i = 0; i < files.length; i++) {
 				this.file_menu.add(new Option(files[i]))
+				if (i === files.length-Object.keys(custom_files).length-1){
+					if (file > i){
+						file++
+					}
+					let opt = new Option('-'.repeat(Math.max(...files.map(file => file.length))))
+					opt.disabled = true
+					this.file_menu.add(opt)
+				}
 	        }
+			
 			this.file_menu.add(new Option('custom'))
 			this.file_menu.selectedIndex = file;
 			this.file_menu.addEventListener('change', (event) => this.select_file(event.target.value));
+			this.params['file'] = this.file_menu
 		}
 		
 		if (document.getElementById('date_slider')){
-	        if( inital_data === null ) {
+	        if( inital_data === null || inital_data['years'] === null ) {
 	            var year_s = 0;
 	            var year_e = 1;
 	        } else {
-	            var year_s = inital_data['year_s'];
-	            var year_e = inital_data['year_e'];
+	            var year_s = inital_data['years'][0];
+	            var year_e = inital_data['years'][1];
 	        }
 
 	        this.year_silder = document.getElementById('date_slider')
@@ -310,12 +375,12 @@ class CrabVisualizationFrameRoot {
 		}
 
         if (document.getElementById('val_slider')){
-	        if( inital_data === null ) {
+	        if( inital_data === null || inital_data['vals'] == null ) {
 	            var max_s = 0;
 	            var max_e = 1;
 	        } else {
-	            var max_s = inital_data['max_s'];
-	            var max_e = inital_data['max_e'];
+	            var max_s = inital_data['vals'][0];
+	            var max_e = inital_data['vals'][1];
 	        }
 
 	        this.max_silder = document.getElementById('val_slider')
@@ -340,8 +405,8 @@ class CrabVisualizationFrameRoot {
 	            var tide_s = 0;
 	            var tide_e = -7;
 	        } else {
-	            var tide_s = inital_data['tide_s'];
-	            var tide_e = inital_data['tide_e'];
+	            var tide_s = inital_data['tide'][1];
+	            var tide_e = inital_data['tide'][0];
 	        }
 
 	        this.tide_silder = document.getElementById('tide_slider')
@@ -363,18 +428,29 @@ class CrabVisualizationFrameRoot {
 
         
 		if (document.getElementById('options_select')){
+	        if( inital_data === null ) {
+	            var options = [];
+	        } else {
+	            var options = inital_data['options'];
+	        }
 			this.options = new MultiselectDropdown(document.getElementById('options_select'), {label: "Options",listener: (selected) => this.select_options(selected), auto_close: false});
-			
 			for (let option of this.options_list()){
 				this.options.addOption(option[0],option[1]);
 			}
+			this.options.set(options,[])
+			
 			this.params['options'] = [this.options,'get']
 		}
 		
 		if (document.getElementById('speicies_select')){
+	        if( inital_data === null ) {
+	            var pre_crabs = this.crabs.slice(1);
+	        } else {
+	            var pre_crabs = inital_data['speiceis'];
+	        }
 	        this.selected_crabs = [];
 	        this.crab_menu = new MultiselectDropdown(document.getElementById('speicies_select'), {label: "No crabs",listener: (selected) => this.select_crab(selected)});
-			if (this.options.get().includes("sci_names")){
+			if (document.getElementById('options_select') && this.options.get().includes("sci_names")){
 		        for( let [ index,label ] of this.crabs.entries() ) {
 		            this.crab_menu.addOption(label,this.file['sci_names'][label]);
 		        }
@@ -384,18 +460,16 @@ class CrabVisualizationFrameRoot {
 		        }
 			}
         	
-	        this.crab_menu.set(this.crabs,[],true);
+	        this.crab_menu.set(pre_crabs,[],true);
 		
 			this.all_crabs_button = document.getElementById('select')
-			this.all_crabs_button.addEventListener("click", () => this.crab_menu.set(this.crabs,[],true));
+			this.all_crabs_button.addEventListener("click", () => this.crab_menu.set(this.crabs.slice(1),[],true));
 		
 			this.no_crabs_button = document.getElementById('deselect')
 	        this.no_crabs_button.addEventListener("click", () => this.crab_menu.set([],this.crabs,true));
 
 	        this.categories_menu = new ButtonDropdown(document.getElementById('category_select'), {label: "Add diets",listener: (cat) => this.select_category(cat) });
-			console.log(this.categorie_list)
 	        for( let label of this.categorie_list ) {
-				console.log(label)
 	            this.categories_menu.addOption(label);
 	        }
 			this.params['speiceis'] = [this.crab_menu,'get']
@@ -424,13 +498,21 @@ class CrabVisualizationFrameRoot {
         
 		if (document.getElementById('visualization')){
 	        if( inital_data === null ) {
-	            var visualization = 0;
+	            var visualization = 'Numbers';
+				if (this.data_cat === 'Coastal studies'){
+					var visualization = 'Presence-absence';
+				}
 	        } else {
-	            var visualization = inital_data['visualization'];
+	            var visualization = inital_data['visualization_type'];
 	        }
 		
-	        this.selected_visualization = "Numbers";
 	        this.visualization_menu = document.getElementById('visualization')
+			for (let option of this.visualization_menu.options){
+				if (option.value === visualization){
+					this.visualization_menu.value = visualization
+					break;
+				}
+			}
 		
 			this.visualization_menu.addEventListener('change', (event) => this.handler());
 			this.params['visualization_type'] = this.visualization_menu
@@ -440,23 +522,36 @@ class CrabVisualizationFrameRoot {
 	        if( inital_data === null ) {
 	            var smoothing = 0;
 	        } else {
-	            var smoothing = inital_data['smoothing'];
+	            var smoothing = inital_data['smoothing_type'];
 	        }
-	        this.selected_smoothing = "Numbers";
+			
 	        this.smoothing_menu = document.getElementById('smoothing')
+			for (let option of this.smoothing_menu.options){
+				if (option.value === smoothing){
+					this.smoothing_menu.value = smoothing
+					break;
+				}
+			}
+			
 		
 			this.smoothing_menu.addEventListener('change', (event) => this.handler());
 			this.params['smoothing_type'] = this.smoothing_menu
 		}
         
 		if (document.getElementById('scaling')){
-	        if( inital_data === null ) {
+	        if( inital_data === null || inital_data['scaling_type'] == null ) {
 	            var scaling = 0;
 	        } else {
-	            var scaling = inital_data['scaling'];
+	            var scaling = inital_data['scaling_type'];
 	        }
-	        this.selected_scaling = "Numbers";
+
 	        this.scaling_menu = document.getElementById('scaling')
+			for (let option of this.scaling_menu.options){
+				if (option.value === scaling){
+					this.scaling_menu.value = scaling
+					break;
+				}
+			}
 		
 			this.scaling_menu.addEventListener('change', (event) => this.handler());
 			this.params['scaling_type'] = this.scaling_menu
@@ -464,33 +559,45 @@ class CrabVisualizationFrameRoot {
 
         
 		if (document.getElementById('graph')){
-	        if( inital_data === null ) {
+	        if( inital_data === null || inital_data['graph_type'] == null ) {
 	            var graph = 0;
 	        } else {
-	            var graph = inital_data['graph'];
+	            var graph = inital_data['graph_type'];
 	        }
-	        this.selected_graph = "Numbers";
+
 	        this.graph_menu = document.getElementById('graph')
+			for (let option of this.graph_menu.options){
+				if (option.value === graph){
+					this.graph_menu.value = graph
+					break;
+				}
+			}
 		
 			this.graph_menu.addEventListener('change', (event) => this.handler());
 			this.params['graph_type'] = this.graph_menu
 		}
         
 		if (document.getElementById('orginaization')){
-	        if( inital_data === null ) {
+	        if( inital_data === null || inital_data['orginization_type'] == null ) {
 	            var orginization = 0;
 	        } else {
-	            var orginization = inital_data['orginization'];
+	            var orginization = inital_data['orginization_type'];
 	        }
-	        this.selected_orginization = "Numbers";
+
 	        this.orginization_menu = document.getElementById('orginaization')
+			for (let option of this.orginization_menu.options){
+				if (option.value === orginization){
+					this.orginization_menu.value = orginization
+					break;
+				}
+			}
 		
 			this.orginization_menu.addEventListener('change', (event) => this.handler());
 			this.params['orginization_type'] = this.orginization_menu
 		}
        
 		console.log(this)
-        this.canvas = new GraphCanvas(this,this.data,this.file['color_dict']);
+        this.canvas = new GraphCanvas(this,this.data,this.file);
 		this.custom_menu = new SelectionFrame(this)
 
         // this.error = Label(self, {text: '',fg: 'red',font: [default_font.actual(), 16, "bold"] });
@@ -500,17 +607,36 @@ class CrabVisualizationFrameRoot {
     }
 	
 	keypress(event){
+	    var key = event.keyCode || event.charCode;
+		console.log(key)
+		if (key === 18) {
+			//this.MDS_download = true
+			this.run_canvas()
+		} else if (key === 83) {
+			console.log(seldovia_custom_files)
+			console.log(costal_studies_custom_files)
+		}
+	}
+	
+	redirect(url){
+		window.parent.postMessage(
+			{ type: "page_end", value: [this.get_params(this.params),[seldovia_custom_files,costal_studies_custom_files]] },
+		  "*"
+		);
+		window.location.replace(url)
+	}
+	
+	get_params(params){
+		let out = {...params}
+		for (let key of Object.keys(out)){
+			out[key] = out[key].value ?? out[key][0][out[key][1]](true)
+		}
+		return out
 	}
 
     run_canvas() {
         if( this.is_active ) {
-			let out = {...this.params}
-			console.log(out)
-			for (let key of Object.keys(out)){
-				console.log(key)
-				out[key] = out[key].value ?? out[key][0][out[key][1]](true)
-			}
-            this.canvas.graph_data(out);
+            this.canvas.graph_data(this.get_params(this.params));
         }
     }
 	select_options(options){
@@ -532,12 +658,12 @@ class CrabVisualizationFrameRoot {
         if( crabs.length === 0 ) {
             this.crab_menu.updateLabel('No ' + this.file['display_name']);
         } else if( (crabs.length) === 1 ) {
-			if (this.options.get().includes("sci_names")){
+			if (document.getElementById('options_select') && this.options.get().includes("sci_names")){
 		        this.crab_menu.updateLabel(this.file['sci_names'][crabs[0]]);
 			} else {
 		        this.crab_menu.updateLabel(crabs[0]);
 			}
-		} else if( (crabs.length) < this.crabs.length ) {
+		} else if( (crabs.length) < this.crabs.length-1 ) {
             this.crab_menu.updateLabel('Custom ' + this.file['display_name']);
 		} else {
             this.crab_menu.updateLabel('All ' + this.file['display_name']);
@@ -567,11 +693,12 @@ class CrabVisualizationFrameRoot {
 			this.custom_menu.activate()
 			return
 		}
+		this.file_save = get_filenames().indexOf(file)
 		this.crab_menu.removeAll()
 		this.categories_menu.removeAll()
         let [data, categories] = cleanup(get_file(file));
 		this.data = data
-        this.file = {"display_name":file,'color_dict':get_colors(file),'sci_names':get_scientific_names(file)};
+        this.file = {"display_name":file,'color_dict':get_colors(file),'type_dict':get_types(file),'sci_names':get_scientific_names(file)};
         this.crabs = Object.keys(Object.values(this.data)[0][0]['crabs']);
 		
 		this.categorie_list = [...new Set(categories.slice().flat())]
@@ -588,7 +715,7 @@ class CrabVisualizationFrameRoot {
 		}
 		
         this.selected_file = this.file["display_name"];
-		if (this.options.get().includes("sci_names")){
+		if (document.getElementById('options_select') && this.options.get().includes("sci_names")){
 	        for( let [ index,label ] of this.crabs.entries() ) {
 	            this.crab_menu.addOption(label,this.file['sci_names'][label]);
 	        }
@@ -602,24 +729,27 @@ class CrabVisualizationFrameRoot {
             this.categories_menu.addOption(label);
         }
 		
-		this.canvas.update(this.data,this.file['color_dict'])
-		let locs = this.location_menu.get()
-		this.location_menu.removeAll()
-        for( let label of Object.keys(this.data) ) {
-            this.location_menu.addOption(label);
-        }
-		console.log(locs)
-        this.location_menu.set(locs,[],false)
-        if( locs.length === 0 ) {
-            this.location_menu.updateLabel('No locations');
-        } else if( (locs.length) === 1 ) {
-            this.location_menu.updateLabel(locs[0]);
-		} else if( (locs.length) < Object.keys(this.data).length ) {
-            this.location_menu.updateLabel('Custom locations');
-		} else {
-            this.location_menu.updateLabel('All locations');
-        }
-        this.crab_menu.set(this.crabs,[],true);
+		this.canvas.update(this.data,this.file)
+		if (document.getElementById('location_select')){
+			let locs = this.location_menu.get()
+			this.location_menu.removeAll()
+	        for( let label of Object.keys(this.data) ) {
+	            this.location_menu.addOption(label);
+	        }
+			console.log(locs)
+	        this.location_menu.set(locs,[],false)
+	        if( locs.length === 0 ) {
+	            this.location_menu.updateLabel('No locations');
+	        } else if( (locs.length) === 1 ) {
+	            this.location_menu.updateLabel(locs[0]);
+			} else if( (locs.length) < Object.keys(this.data).length ) {
+	            this.location_menu.updateLabel('Custom locations');
+			} else {
+	            this.location_menu.updateLabel('All locations');
+	        }
+		}
+		
+        this.crab_menu.set(this.crabs.slice(1),[],true);
     }
 	reset(ind){
 		let files = get_filenames()
@@ -629,7 +759,7 @@ class CrabVisualizationFrameRoot {
 			
         let [data, categories] = cleanup(get_file(files[file]));
 		this.data = data
-        this.file = {"display_name":files[file],'color_dict':get_colors(files[file])};
+        this.file = {"display_name":files[file],'color_dict':get_colors(files[file]),'type_dict':get_types(files[file]),'sci_names':get_scientific_names(files[file])};
         this.crabs = Object.keys(Object.values(this.data)[0][0]['crabs']);
 		
 		this.categorie_list = [...new Set(categories.slice().flat())]
@@ -650,36 +780,69 @@ class CrabVisualizationFrameRoot {
 		this.file_menu.innerHTML = ''
         for(let i = 0; i < files.length; i++) {
 			this.file_menu.add(new Option(files[i]))
+			if (i === files.length-Object.keys(custom_files).length-1){
+				if (file > i){
+					file++
+				}
+				let opt = new Option('–'.repeat(Math.max(...files.map(file => file.length))))
+				opt.disabled = true
+				this.file_menu.add(opt)
+			}
         }
 		this.file_menu.add(new Option('custom'))
 		this.file_menu.selectedIndex = file;
 		
 	}
 	select_custom(){
+		console.log(this.files)
 		this.reset(this.files.length)
 		this.select_file(this.file['display_name'])
 	}
+	cancel_custom(){
+		this.file_menu.selectedIndex = this.file_save;
+	}
 	select_area(area){
+		window.parent.postMessage(
+			{ type: "area", value: area },
+		  "*"
+		);
 		console.log(area)
 		this.data_cat = area
 		if (this.data_cat === 'Seldovia') {
+			this.visualization_menu.disabled = false
+			this.scaling_menu.disabled = false
 			raw_data = seldovia_raw_data
 			do_notes = true
 			custom_files = seldovia_custom_files
 			location_data = get_loc_data(seldovia_location_data)
 		} else if (this.data_cat === 'Coastal studies') {
+			this.scaling_menu.value = 'Linear'
+			this.visualization_menu.value = 'Presence-absence'
+			this.visualization_menu.disabled = true
+			this.scaling_menu.disabled = true
 			raw_data = costal_studies_raw_data
 			do_notes = false
 			custom_files = costal_studies_custom_files
 			location_data = get_loc_data(costal_studies_location_data)
 		}
 		this.reset(0)
-		this.location_menu.removeAll()
-        for( let label of Object.keys(this.data) ) {
-            this.location_menu.addOption(label);
-        }
-        this.location_menu.set(Object.keys(this.data),[],false)
-		this.location_menu.updateLabel('All locations');
+		if (document.getElementById('location_select')){
+			this.location_menu.removeAll()
+	        for( let label of Object.keys(this.data) ) {
+	            this.location_menu.addOption(label);
+	        }
+	        this.location_menu.set(Object.keys(this.data),[],false)
+			this.location_menu.updateLabel('All locations');
+		}
+		
+		if (document.getElementById('options_select')){
+			let options = this.options.get()
+			this.options.removeAll()
+			for (let option of this.options_list()){
+				this.options.addOption(option[0],option[1]);
+			}
+			this.options.set(options,[])
+		}
 		this.select_file(this.file['display_name'])
 	}
     // select_data_cat(ind) {
@@ -709,25 +872,32 @@ class CrabVisualizationFrameRoot {
     select_category(category) {
         this.crab_menu.set(this.categories[category],[],true)
     }
-    display(val,pre,loc,date,notes,event=null) {
-        if( this.selected_visualization && this.selected_visualization in ['Percent','Percent of selected','Percent relative to average','Percent of the way to average'] && val !== '' ) {
-            var post = '%';
-        } else {
-            var post = '';
-        }
-        if( notes !== '' ) {
-            var post2 = ', ';
-        } else {
-            var post2 = '';
-        }
-		if (!val && !pre && !loc && !date && !notes ){
+    display(l0,l1,l2,event=null) {
+		if (!l0 && !l1 && !l2){
 			document.getElementById("mouseover_container").style.display = "none";
 		} else {
 			document.getElementById("mouseover_container").style.display = "flex";
 		}
-        document.getElementById("mouseover0").innerHTML = pre+String(val)+post+post2+notes;
-        document.getElementById("mouseover1").innerHTML = loc;
-        document.getElementById("mouseover2").innerHTML = date;
+        document.getElementById("mouseover0").innerHTML = l0;
+        document.getElementById("mouseover1").innerHTML = l1;
+        document.getElementById("mouseover2").innerHTML = l2;
+    }
+    
+	display_details(l0,l1,l2,la) {
+		if (!l0 && !l1 && !l2){
+			document.getElementById('page-overlay0').classList.add('hidden');
+			document.getElementById('details').classList.add('hidden');
+		} else {
+			document.getElementById('page-overlay0').classList.remove('hidden');
+			document.getElementById('details').classList.remove('hidden');
+		}
+        document.getElementById("details0").innerHTML = l0;
+        document.getElementById("details1").innerHTML = l1;
+        document.getElementById("details2").innerHTML = l2;
+		document.getElementById("details3").innerHTML = '';
+		for (let l of la){
+			makeNewElement('details3','label',{},l)
+		}
     }
 //
     display_error(txt) {
@@ -739,9 +909,12 @@ class CrabVisualizationFrameRoot {
     }
 
 }
+
+
+
  class GraphCanvasRoot {
 
-    constructor(master,data,crab_colors) {
+    constructor(master,data,file) {
 		let page_width = document.documentElement.clientWidth;
 		this.master = master
 		this.x_size = page_width-200
@@ -753,7 +926,8 @@ class CrabVisualizationFrameRoot {
 	        'shape-rendering':'crispEdges'
 	    });
         this.data = data;
-        this.crab_colors = crab_colors;
+        this.crab_colors = file['color_dict'];
+		this.crab_types = file['type_dict'];
         this.data_coords = [];
         this.orginization_type = '';
         this.graph_type = '';
@@ -766,14 +940,25 @@ class CrabVisualizationFrameRoot {
 			let y = e.clientY - rect.top;
 			this.handle_motion(x,y)
 		});
+		document.getElementById("canvas").addEventListener('click', (e) => {
+			let rect = e.currentTarget.getBoundingClientRect();
+
+			let x = e.clientX - rect.left;
+			let y = e.clientY - rect.top;
+			this.get_details(x,y)
+		});
 		window.addEventListener('mousemove', (e) => {
 			this.master.display('','','','','') 
 		});
+		document.getElementById("page-overlay0").addEventListener('click', (e) => {
+			this.master.display_details('','','',[]) 
+		});
     }
 
-	update(data,crab_colors){
+	update(data,file){
         this.data = data;
-        this.crab_colors = crab_colors;
+        this.crab_colors = file['color_dict'];
+		this.crab_types = file['type_dict'];
 	}
 
     graph_data(params) {
@@ -873,7 +1058,6 @@ class CrabVisualizationFrameRoot {
 			}
 		}
 			
-		
         data = structuredClone(data.filter( low_tide => days.includes(get_date_num(low_tide['date'])) && low_tide['tide'] < tide_s && low_tide['tide'] > tide_e ));
 		console.log(params['orginization_type'])
 		if (params['orginization_type']){
@@ -919,7 +1103,10 @@ class CrabVisualizationFrameRoot {
 		if (params['visualization_type']){
 			var li = this.run_viz(data, params['visualization_type'], crabs)
 		}
-		
+        if( !li.length ) {
+			console.log('no species')
+            return;
+        }
 		
 		let d = 0;
 		if ( ["Smoothed low","Smoothed medium","Smoothed high"].includes(params['smoothing_type'])){
@@ -927,7 +1114,7 @@ class CrabVisualizationFrameRoot {
 			let r;
 	        if ( params['smoothing_type'] === "Smoothed low" ) {
 	            k = 40;
-				r = 86
+				r = 16
 	        } else if( params['smoothing_type'] === "Smoothed medium" ) {
 	            k = 70;
 				r = 20
@@ -954,11 +1141,10 @@ class CrabVisualizationFrameRoot {
 			console.log(structuredClone(data))
 			console.log(structuredClone(li))
 		}
-		
         this.run_graph(data,li,x_max,params,days,d);
         this.draw_x_scalebar(days,params);
         let do_svg = false;
-		
+		console.log('awesrdtfy')
     }
 	
 	organize(data,orginization_type,locations){
@@ -984,8 +1170,7 @@ class CrabVisualizationFrameRoot {
             li.push( lii.map( x =>x[i] ));
         }
         if( !li.length ) {
-			console.log('no species')
-            return;
+            return li;
         }
 		if ( ['Relative to average','Percent relative to average','Percent of the way to average'].includes(visualization_type) ) {
 			var avgs = range(crabs.length).map( i => Math.max(sum(li[i])/li[i].length,0.000001));
@@ -1041,9 +1226,12 @@ class CrabVisualizationFrameRoot {
 	        }
 		} else if( visualization_type === 'Presence-absence' ) {
 	        for ( let i of range(li.length) ) {
-		        for ( let j of range(data.length) ) {
-		        	li[i][j] = presence_absence(0,data[j]['crabs'][crabs[i]][2],true)
-		        }
+				if (this.crab_types[crabs[i]] !== 'B'){
+			        for ( let j of range(data.length) ) {
+			        	li[i][j] = presence_absence(0,data[j]['crabs'][crabs[i]][2],true)
+			        }
+				}
+
 	        }
 		}
 		return li
@@ -1094,9 +1282,9 @@ class CrabVisualizationFrameRoot {
 				if (data[j]['date'] >= bin_end){
 					if (!i){
 						data_n.push(structuredClone(data[j]))
-						data_n.at(-1)['date'] = Math.round((bin_num+0.5)*d)
+						data_n.at(-1)['date'] = (bin_num+0.5)*d
 						data_n.at(-1)['dateTXT'] = get_date(Math.floor((bin_num)*d)) + '-' + get_date(Math.floor((bin_num+1)*d))
-						data_n.at(-1)['location'] = `${li_n[i].at(-1)[1]} surveys`
+						data_n.at(-1)['count'] = `${li_n[i].at(-1)[1]} surveys`
 					}
 					li_n[i][li_n[i].length-1] = li_n[i].at(-1)[0]/li_n[i].at(-1)[1]
 					bin_num = ~~(data[j]['date']/d);
@@ -1108,9 +1296,9 @@ class CrabVisualizationFrameRoot {
 			}
 			if (!i){
 				data_n.push(structuredClone(data.at(-1)))
-				data_n.at(-1)['date'] = Math.round((bin_num+0.5)*d)
+				data_n.at(-1)['date'] = (bin_num+0.5)*d
 				data_n.at(-1)['dateTXT'] = get_date(Math.floor((bin_num)*d)) + '-' + get_date(Math.floor((bin_num+1)*d))
-				data_n.at(-1)['location'] = `${li_n[i].at(-1)[1]} surveys`
+				data_n.at(-1)['count'] = `${li_n[i].at(-1)[1]} surveys`
 			}
 			li_n[i][li_n[i].length-1] = li_n[i].at(-1)[0]/li_n[i].at(-1)[1]
 		}
@@ -1253,30 +1441,17 @@ class CrabVisualizationFrameRoot {
         return t_max,t_min;
     }
 
-    handle_motion(x,y) {
-        if( this.graph_type === 'Stacked' ) {
-            return;
-        }
-        if (this.data_coords.length) {
-            if( this.data_coords[0].length === 0 ) {
-                this.master.display('','','','','');
-                return;
-            }
-        } else {
-            if( this.graph_type !== 'Stacked' ) {
-                this.master.display('','','','','');
-            }
-            return;
-        }
+	
+
+	get_near(x,y){
         let trans_dict = this.data_coords[1];
         let min_dist = [30000,30000];
         let m = 0;
-	
         for( let [ i,data_coord ] of this.data_coords[0].entries() ) {
 			if (trans_dict['d']){
-	            if( (Math.abs(x - data_coord[0][0]+10)+Math.abs(x - (data_coord[0][0]+data_coord[6]) + 10)-data_coord[6])/2+Math.abs(y - data_coord[0][1]-10)
+	            if( (Math.abs(x - data_coord[0][0]+10)+Math.abs(x - (data_coord[0][0]+data_coord[1]) + 10)-data_coord[1])/2+Math.abs(y - data_coord[0][1]-10)
 	               < min_dist[0]+min_dist[1] ) {
-	                min_dist = [(Math.abs(x - data_coord[0][0]+10)+Math.abs(x - (data_coord[0][0]+data_coord[6]) + 10)-data_coord[6])/2,
+	                min_dist = [(Math.abs(x - data_coord[0][0]+10)+Math.abs(x - (data_coord[0][0]+data_coord[1]) + 10)-data_coord[1])/2,
 	                            Math.abs(y - data_coord[0][1]-10),data_coord];
 	                m = i;
 	            }
@@ -1295,22 +1470,57 @@ class CrabVisualizationFrameRoot {
 			r = 6
 		}
         if( min_dist[0] + min_dist[1] < r ) {
-            /*self.master.display(round(((min_dist[2][0][1]-40)/trans_dict['y_scale']\
-                                -trans_dict['y_max'])*(-1)*10)/10,min_dist[2][1]+': ',
-                                self.data_coords[0][m][2],self.data_coords[0][m][3],self.data_coords[0][m][4])*/
-			if (this.data_coords[1]['orginization_type'] === 'Locational'){
-				this.master.display(`${this.data_coords[0][m][5]} x${this.data_coords[0][m][3]}`,min_dist[2][1]+': ',
-                    	`${this.data_coords[0][m][2]}`,'','');
-			} else {
-				this.master.display(this.data_coords[0][m][5],min_dist[2][1]+': ',
-                    	this.data_coords[0][m][2],this.data_coords[0][m][3],this.data_coords[0][m][4]);
-			}
+			return this.data_coords[0][m]
+		} else {
+			return null
+		}
+	}
+	
+	get_details(x,y){
+        if( this.graph_type === 'Stacked' || this.data_coords[1]['orginization_type'] === 'Locational' ) {
+            return;
+        }
+        if (this.data_coords.length) {
+            if( this.data_coords[0].length === 0 ) {
+                this.master.display_details('','','',[]);
+                return;
+            }
         } else {
             if( this.graph_type !== 'Stacked' ) {
-                this.master.display('','','','','');
+                this.master.display_details('','','',[]);
             }
+            return;
         }
-    }
+		let p = this.get_near(x,y)
+		if (p){
+			let species_details = []
+			let info = p[2]
+			console.log(info)
+			for (let species of Object.keys(info['crabs'])){
+				if ((info['crabs'][species][2] != '0' && info['crabs'][species][2] !== 'avg 0.00') || species === 'biodiversity'){
+					let txt = ''
+					if ((this.data_coords[1]['visualization_type'] === 'Presence-absence' || this.data_coords[1]['params']['area'] === 'Coastal studies') && species !== 'biodiversity'){
+						txt += species
+					} else {
+						txt += `${species}: ${info['crabs'][species][2]}`
+					} 
+					if (this.data_coords[1]['d']){
+						txt += `${info['crabs'][species][1]?', ':''}${info['crabs'][species][1]}`
+					}
+					species_details.push(txt)
+				}
+				
+			}
+			if (this.data_coords[1]['d']){
+				this.master.display_details(info['count'],info['dateTXT'],'',species_details);
+			} else {
+				this.master.display_details(info['location'],info['dateTXT'],'',species_details);
+			}
+		} else {
+			this.master.display_details('','','',[]);
+		}
+	}
+	
     draw_point(coords,color,size) {
         this.draw.circle(size*2).fill(color).move(coords[0]-size,coords[1]-size);
     }
@@ -1322,4 +1532,65 @@ window.addEventListener('pointermove', (e) => {
   document.documentElement.style.setProperty('--mouse-y', `${e.clientY}px`);
 });
 
+function initilize(object){
+	window.addEventListener("message", (event) => {
+		console.log(event.data?.type)
+		if (event.data?.type === "params") {
+			seldovia_custom_files = event.data.value[1][0]
+			costal_studies_custom_files = event.data.value[1][1]
+			new object(event.data.value[0],null)
+		} else if (event.data?.type === "area") {
+			if (event.data.value === 'Coastal studies'){
+				new object({
+				    "area": "Coastal studies",
+				    "file": "sea stars",
+				    "years": [
+				        0,
+				        1
+				    ],
+				    "vals": [
+				        0,
+				        1
+				    ],
+				    "tide": [
+				        -7,
+				        0
+				    ],
+				    "options": [],
+				    "speiceis": [
+						'True Star', 
+						'Little 6-Rayed Star', 
+						'Leather Star', 
+						'Sunflower Star', 
+						'Ochre Star', 
+						'Red-Banded Star', 
+						'Morning Sun Star', 
+						"Stimpson's Sun Star", 
+						'Rose Star', 
+						'Blood Star', 
+						'velcro star'
+					],
+				    "locations": [
+				        "Otter Rock",
+				        "China Poot"
+				    ],
+				    "visualization_type": "Presence-absence",
+				    "smoothing_type": "Year bins",
+				    "scaling_type": "Linear",
+				    "graph_type": "Stacked",
+				    "orginization_type": "Standard"
+				},event.data.value)
+			} else {
+				new object(null,event.data.value)
+			}
+			
+		}
+	});
+	window.parent.postMessage(
+		{ type: "page_begin", value: window.location.pathname },
+	  "*"
+	);
+	
+	
+}
 
