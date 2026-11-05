@@ -15,7 +15,7 @@
 
 function cleanup(data_reader) {
     //Get_temp_data.update_data(datetime.datetime.today());
-	console.log(data_reader)
+	console.log(temp_data)
 	let rows = get_rows()
     let max_row = data_reader.length;
     let max_column = data_reader[3].length;
@@ -36,7 +36,6 @@ function cleanup(data_reader) {
 		}
 	}
     let groups = data[2].slice(rows.length);
-	console.log(data)
     data = data.slice(3 );
 	if (do_notes){
 	    var notes = data.filter((_, i) => i % 2 !== 0);
@@ -96,6 +95,7 @@ function get_crab_dict(crabs_counts,crab_indicies,notes,groups) {
     let group_dict = {};
     for( let crab_type of Object.keys(crab_indicies) ) {
         let crab_index = crab_indicies[crab_type];
+		groups[crab_index] = [groups[crab_index][0],groups[crab_index].slice(1)]
         if( ['G','I'].includes(groups[crab_index][0]) ) {
             let [count,was_seen,returntype] = get_count(crabs_counts[crab_index]);
             if( was_seen ) {
@@ -108,7 +108,11 @@ function get_crab_dict(crabs_counts,crab_indicies,notes,groups) {
             }
             crab_dict[crab_type] = [count,notes[crab_index],display_val];
         } else if( ['S','A'].includes(groups[crab_index][0]) ) {
-            group_dict[groups[crab_index][1]] = [[get_count(crabs_counts[crab_index])[0],notes[crab_index]],1,
+			let c = 0
+			if (groups[crab_index][0] === 'S'){
+				c = 1
+			}
+            group_dict[groups[crab_index][1]] = [[get_count(crabs_counts[crab_index])[0],notes[crab_index]],c,
                                                  groups[crab_index][0],crab_type];
 		} else if( groups[crab_index][0] == 'B' ) {
 
@@ -123,7 +127,7 @@ function get_crab_dict(crabs_counts,crab_indicies,notes,groups) {
                 group_dict[groups[crab_index][1]][0][0] += get_count(crabs_counts[crab_index])[1];
             } else {
                 group_dict[groups[crab_index][1]][0][0] += get_count(crabs_counts[crab_index])[0];
-                if( group_dict[groups[crab_index][1]][2] === 'A' ) {
+                if( group_dict[groups[crab_index][1]][2] === 'A' && groups[crab_index][0] !== 'A') {
                     group_dict[groups[crab_index][1]][1] ++
                 }
             }
