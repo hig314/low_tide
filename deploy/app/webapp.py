@@ -25,6 +25,7 @@ import json
 import MDS
 from flask_cors import CORS
 import lzw
+import pickle
 
 app = Flask(__name__)
 CORS(app) # CORS headers to make devel easier
@@ -33,19 +34,25 @@ CORS(app) # CORS headers to make devel easier
 # return var data as json
 @app.route('/requests/NMDS', methods = ['GET', 'POST'])
 def getwxvarjson():
-        data = MDS.NMDS(lzw.lzw_decode(request.get_json()))
-        resp = Response( json.dumps(data.tolist()), mimetype='application/json')
-        #resp.headers['Access-Control-Allow-Origin'] = '*' # get around CORS during development
-        return resp
+    data = MDS.NMDS(lzw.lzw_decode(request.get_json()))
+    resp = Response( json.dumps(data.tolist()), mimetype='application/json')
+    #resp.headers['Access-Control-Allow-Origin'] = '*' # get around CORS during development
+    return resp
 
-# return reading/weather variables as json
-@app.route('/wxapp/wxvars')
-def wxvarsjson():
-	json_data = json.dumps( wxdata.get_wxvar_list() )
-	resp = Response( json_data, mimetype='application/json')
-	resp.headers['Access-Control-Allow-Origin'] = '*' # get around CORS during development
-	print(resp)	#debug
-	return resp
+@app.route('/requests/upload', methods = ['GET', 'POST'])
+def upload():
+    data = request.get_json()
+    file = open('keys.pickle', 'rb')
+    keys = pickle.load(file)
+    file.close()
+    if data[0] == keys['upload']:
+        if data[2][:7] == 'static/' and '..' not in data[2]:
+            with open(data[2], "w", encoding="utf-8") as js:
+                js.write(data[1])
+                resp = Response( json.dumps('success'), mimetype='application/json')
+                return resp
+    resp = Response( json.dumps('invalid key'), mimetype='application/json')
+    return resp
 
 # redirect to root route
 @app.route('/')
