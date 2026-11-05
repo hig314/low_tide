@@ -19,13 +19,15 @@ var do_notes = true
 
 class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 	
-	constructor(inital_data=null) {
-		super()
+	constructor(inital_data,area) {
+		super(inital_data,area)
 		this.handler = this.activate
+		this.overlay = false
 		this.shapes = new BetterDropdown(document.getElementById('shapes_select'), {label: "Shapes: none",listener: (selected) => this.select_shapes(selected)});
 		this.shapes.addOption('none','None');
 		this.shapes.addOption('locations','Locations');
 		this.params['shapes'] = [this.shapes,'get']
+		this.shapes.set('locations',true)
 		
 		this.colors = new BetterDropdown(document.getElementById('colors_select'), {label: "Colors: none",listener: (selected) => this.select_colors(selected)});
 		this.colors.addOption('none','None');
@@ -36,17 +38,26 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 		this.colors.addOption('quarter','Quarter');
 		this.colors.addOption('tide','Tide');
 		this.params['colors'] = [this.colors,'get']
+		this.colors.set('year',true)
+		
 		document.getElementById('generate').addEventListener("click", () => this.run());
-		document.getElementById('redirect').href=`${window.location.protocol}//${window.location.host}/static/main/index_lt.html`
+		document.getElementById('redirect').addEventListener("click", () => this.redirect(`${window.location.protocol}//${window.location.host}/static/main/index_lt.html`));
 		document.getElementById('info').href=`${window.location.protocol}//${window.location.host}/static/NMDS/info.html`
+		this.run()
     }
 	
 	activate(){
 		document.getElementById('generate').style.borderColor='#ff0000'
 		document.getElementById('generate').style.borderWidth='2px'
 		document.getElementById('generate').style.fontWeight='bold'
+		if (!this.overlay){
+			this.overlay = true
+			this.canvas.overlay()
+		}
+		
 	}
 	run(){
+		this.overlay = false
 		document.getElementById('generate').style.borderColor='#000000'
 		document.getElementById('generate').style.borderWidth='1px'
 		document.getElementById('generate').style.fontWeight='normal'
@@ -73,9 +84,12 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 	}
 	
 	options_list() {
-		return [['requires_stndard','Requires standard group'],['sci_names','Use scientific names'],['shapes','Use location shapes in scatter plot']];
+		let options = [['sci_names','Use scientific names']];
+		if (this.data_cat === 'Seldovia'){
+			options.push(['requires_stndard','Requires standard group'])
+		}
+		return options;
 	}
-
 }
  class GraphCanvas extends GraphCanvasRoot {
 
@@ -109,7 +123,7 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 			console.warn('Problem with fetch. Status Code: ' + response.status );
 		} 
 		let NMDS = await response.json()
-		this.draw_graph(data,NMDS,params['speiceis'],params['locations'],params['options'],params['shapes'],params['colors'])
+		this.draw_graph(data,NMDS,params['speiceis'],params['locations'],params['options'],params['shapes'],params['colors'],d,params)
 		this.waiting = false
 		
 		
@@ -140,6 +154,7 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 	
 	bin(li,data,d,params){
 		console.log(params)
+		let crabs = Object.keys(data[0]['crabs'])
 		if (params['shapes'] === 'locations' || params['colors'] === 'locations'){
 			let data_n = {}
 			let li_n = {}
@@ -165,8 +180,11 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 							data_n[loc].push(structuredClone(data[j]))
 							data_n[loc].at(-1)['date'] = Math.round((bin_num+0.5)*d)
 							data_n[loc].at(-1)['dateTXT'] = get_date(Math.floor((bin_num)*d)) + '-' + get_date(Math.floor((bin_num+1)*d))
+							data_n[loc].at(-1)['count'] = `${li_n[loc][i].at(-1)[1]} surveys`
 						}
+						
 						li_n[loc][i][li_n[loc][i].length-1] = li_n[loc][i].at(-1)[0]/li_n[loc][i].at(-1)[1]
+						data_n[loc][li_n[loc][i].length-1]['crabs'][crabs[i]][2] = `avg ${li_n[loc][i].at(-1).toFixed(2)}`
 						bin_ns[loc] = ~~(data[j]['date']/d);
 					
 						li_n[loc][i].push([0,0])
@@ -180,8 +198,11 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 						data_n[loc].push(structuredClone(lasts[loc]))
 						data_n[loc].at(-1)['date'] = Math.round((bin_ns[loc]+0.5)*d)
 						data_n[loc].at(-1)['dateTXT'] = get_date(Math.floor((bin_ns[loc])*d)) + '-' + get_date(Math.floor((bin_ns[loc]+1)*d))
+						data_n[loc].at(-1)['count'] = `${li_n[loc][i].at(-1)[1]} surveys`
 					}
+					
 					li_n[loc][i][li_n[loc][i].length-1] = li_n[loc][i].at(-1)[0]/li_n[loc][i].at(-1)[1]
+					data_n[loc][li_n[loc][i].length-1]['crabs'][crabs[i]][2] = `avg ${li_n[loc][i].at(-1).toFixed(2)}`
 				}
 				bin_ns = {}
 			}
@@ -199,6 +220,7 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 			return [li_out,data_out]
 		}
 		else {
+			console.log(crabs)
 			let data_n = []
 			let li_n = []
 			for (let i = 0; i < li.length; i++){
@@ -212,9 +234,10 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 							data_n.push(structuredClone(data[j]))
 							data_n.at(-1)['date'] = Math.round((bin_num+0.5)*d)
 							data_n.at(-1)['dateTXT'] = get_date(Math.floor((bin_num)*d)) + '-' + get_date(Math.floor((bin_num+1)*d))
-							data_n.at(-1)['location'] = `${li_n[i].at(-1)[1]} surveys`
+							data_n.at(-1)['count'] = `${li_n[i].at(-1)[1]} surveys`
 						}
 						li_n[i][li_n[i].length-1] = li_n[i].at(-1)[0]/li_n[i].at(-1)[1]
+						data_n[li_n[i].length-1]['crabs'][crabs[i]][2] = `avg ${li_n[i].at(-1).toFixed(2)}`
 						bin_num = ~~(data[j]['date']/d);
 						bin_end = (bin_num+1)*d
 						li_n[i].push([0,0])
@@ -226,23 +249,42 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 					data_n.push(structuredClone(data.at(-1)))
 					data_n.at(-1)['date'] = Math.round((bin_num+0.5)*d)
 					data_n.at(-1)['dateTXT'] = get_date(Math.floor((bin_num)*d)) + '-' + get_date(Math.floor((bin_num+1)*d))
-					data_n.at(-1)['location'] = `${li_n[i].at(-1)[1]} surveys`
+					data_n.at(-1)['count'] = `${li_n[i].at(-1)[1]} surveys`
+					
 				}
 				li_n[i][li_n[i].length-1] = li_n[i].at(-1)[0]/li_n[i].at(-1)[1]
+				data_n[li_n[i].length-1]['crabs'][crabs[i]][2] = `avg ${li_n[i].at(-1).toFixed(2)}`
 			}
 			return [li_n,data_n]
 		}
 	}
 
-    draw_graph(data,NMDS,crabs,locations,options,shapes,colors) {
+    draw_graph(data,NMDS,crabs,locations,options,shapes,colors,d,params) {
 		console.log(NMDS)
 		this.master.update_point_count(data.length);
 		
-        let x_max = Math.max(...NMDS.map( tide => tide[0] ));
-		let x_min = Math.min(...NMDS.map( tide => tide[0] ));
+        let x_max_pre = Math.max(...NMDS.map( tide => tide[0] ));
+		let x_min_pre = Math.min(...NMDS.map( tide => tide[0] ));
 		
-        let y_max = Math.max(...NMDS.map( tide => tide[1] ));
-		let y_min = Math.min(...NMDS.map( tide => tide[1] ));
+        let y_max_pre = Math.max(...NMDS.map( tide => tide[1] ));
+		let y_min_pre = Math.min(...NMDS.map( tide => tide[1] ));
+		
+		if (y_max_pre-y_min_pre > x_max_pre-x_min_pre){
+			for (let tide of NMDS){
+				tide.reverse()
+			}
+			var x_max = y_max_pre
+			var x_min = y_min_pre
+			
+			var y_max = x_max_pre
+			var y_min = x_min_pre
+		} else {
+			var x_max = x_max_pre
+			var x_min = x_min_pre
+			
+			var y_max = y_max_pre
+			var y_min = y_min_pre
+		}
 		
         let date_max = Math.max(...data.map( low_tide => low_tide['date'] ));
 		let date_min = Math.min(...data.map( low_tide => low_tide['date'] ));
@@ -259,8 +301,7 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 		console.log(data)
 		for (let i = 0; i < NMDS.length; i++){
 			li.push([(NMDS[i][0]-x_min)*scale+40+this.padding+10,(NMDS[i][1]-y_min)*scale+40,dot_size])
-
-			data_coords.push([li[i],data[i]['location'],data[i]['dateTXT'],data[i]['tide']]);
+			data_coords.push([li[i],0,data[i]]);
 		}
 		let data_coords_t = structuredClone(data_coords)
 		for (let i = 0; i < li.length; i++){
@@ -297,9 +338,18 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
 			        }).scale(li[i][2],0,0).translate(li[i][0],li[i][1]); //
 		}
 		data_coords_t.reverse()
- 		this.data_coords = [data_coords_t,{'y_max':y_max,'scale':scale}];
+ 		this.data_coords = [data_coords_t,{'y_max':y_max,'scale':scale,'d':d,'params':params}];
 
     }
+	
+	overlay(){
+		this.draw.rect(9999,9999).attr({
+					            'fill':'#eeeeee',
+								'fill-opacity': 0.7,
+					            'shape-rendering':'crispEdges',
+					            'stroke-width': 0
+					        });
+	}
     
     draw_x_scalebar(days,graph_type,orginization_type,locations) {
     }
@@ -318,23 +368,21 @@ class CrabVisualizationFrame extends CrabVisualizationFrameRoot {
             }
             return;
         }
-        let trans_dict = this.data_coords[1];
-        let min_dist = [30000,30000];
-        let m = 0;
-	
-        for( let [ i,data_coord ] of this.data_coords[0].entries() ) {
-            if ( Math.abs(x - data_coord[0][0]+10)+Math.abs(y - data_coord[0][1]-10)
-               < min_dist[0]+min_dist[1] ) {
-                min_dist = [Math.abs(x - data_coord[0][0]+10),
-                            Math.abs(y - data_coord[0][1]-10),data_coord];
-                m = i;
+        let p = this.get_near(x,y)
+        if (p) {
+			let info = p[2]
+			let params = this.data_coords[1]['params']
+			if (this.data_coords[1]['d']){
+				if (params['shapes'] === 'locations' || params['colors'] === 'locations'){
+					this.master.display(`${info['location']}, ${info['tide']}`,info['dateTXT'],info['count']);
+				} else {
+					this.master.display(`${info['count']}, ${info['tide']}`,info['dateTXT'],'');
+				}
+				
+			} else {
+				this.master.display(`${info['location']}, ${info['tide']}`,info['dateTXT'],'');
 			}
-            
-        }
-		let r = 12
-        if( min_dist[0] + min_dist[1] < r ) {
-			this.master.display(this.data_coords[0][m][1],'',
-                	this.data_coords[0][m][2],'',this.data_coords[0][m][3]);
+			
         } else {
             if( this.graph_type !== 'Stacked' ) {
                 this.master.display('','','','','');
@@ -350,6 +398,6 @@ window.addEventListener('pointermove', (e) => {
   document.documentElement.style.setProperty('--mouse-y', `${e.clientY}px`);
 });
 
-new CrabVisualizationFrame();
+initilize(CrabVisualizationFrame)
 
 
