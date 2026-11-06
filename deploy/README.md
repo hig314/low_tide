@@ -100,7 +100,7 @@ without their excludes `--delete` would remove them from the live site.
       --exclude 'static/seldovia_sheet.js' --exclude 'static/costal_studies_sheet.js' \
       --exclude 'static/Temp_data.js' --exclude 'static/temp_data.js' \
       --exclude 'static/seldovia_locations.js' --exclude 'static/costal_studies_locations.js' \
-      --exclude 'keys.pickle' \
+      --exclude 'keys.pickle' --exclude 'static/seldovia_customs.js' --exclude 'static/costal_studies_customs.js' \
       docker-compose.yml nginx.conf api app  root@164.92.75.176:/opt/lowtide/
 
     # 2. case-fix alias, perms, then rebuild/recreate. --force-recreate matters:

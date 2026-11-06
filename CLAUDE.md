@@ -5,23 +5,29 @@ Snapshot for resuming after a break. Last worked: 2026-11-05 (Alaska).
 ## ▶ Where we left off (2026-11-05) — read this first
 
 **Everything is deployed, verified and committed. Nothing is mid-flight.**
-One known live-data bug is waiting on the user's go-ahead (open item 0).
+One known live-data bug is waiting on the user's go-ahead (open item 0), and one
+deploy-safety message needs to reach Katmai (open item 0a).
 
 New since 2026-10-25:
-- **The backend can now write the front end** (2026-11-05, the user's decision):
-  her new `/requests/upload` endpoint overwrites files under `static/`, guarded
-  only by the key in `/opt/lowtide/app/keys.pickle`. See "Key facts". A real upload
-  with the key hasn't been confirmed yet (only the wrong-key path was tested).
-- **Katmai has root SSH** (2026-11-02) and deploys herself: she deployed her
-  11-05 commits (webapp.py upload route, lzw.py, Get_temp_data.py, page reworks)
-  with the SOP refresh. `static/Hub/` was **not live yet** (404) as of 11-05. On
-  restart, check what's live rather than trusting the "Code deployed" line.
+- **Two people deploy now.** Katmai has root SSH (2026-11-02) and deploys her own
+  commits. So "Code deployed" below is a snapshot, not a promise. On restart,
+  compare live with GitHub using the **dry-run check** under "First thing on restart".
+- **The backend can write the front end** (2026-11-05, the user's decision): her
+  `/requests/upload` endpoint (key in droplet-only `/opt/lowtide/app/keys.pickle`)
+  writes files under `static/`. See "Key facts" and the 2026-11-05 change log entry.
+  **Real uploads work:** at 02:24 UTC 11-06 they created
+  `static/seldovia_customs.js` (19.7 KB) and `static/costal_studies_customs.js`
+  (6.6 KB), which `NMDS/index_NMDS.html` loads.
+- ⚠️ **Those two `*_customs.js` files are droplet-only (not in git)**, like the
+  location blobs, and droplet backups are off, so the server copy is the only one.
+  Added to the deploy rsync excludes (here, `deploy/README.md`,
+  `deploy/refresh/README.md`), but Katmai's own copy of the command doesn't have
+  them yet (item 0a).
 - **Security review done 2026-11-02;** the user decided the arrangement is
   sufficient for now. Remaining notes are in Claude's private memory, deliberately
   not in this public repo. Don't redo the review unless asked.
-- **Her local dev page calls the live NMDS backend** (`lowtide-api` log, 10-31 and
-  11-01, referer `http://192.168.194.103:5001/`, plus a 404 on `/requests/upload`).
-  Presumably Katmai testing a new upload feature; not confirmed with her.
+- Her local dev page (`http://192.168.194.103:5001/`) calls the live backend
+  over https://lowtidedata.org; that's how she drives uploads. Expected.
 
 - **Live:** https://lowtidedata.org — main + NMDS pages (verified in a browser
   2026-10-18). Containers `lowtide` + `lowtide-api`.
@@ -34,26 +40,33 @@ New since 2026-10-25:
   `deploy/archive/README.md`. Fork's newer `47355ae` is README-only: nothing to deploy.
 - **HWITW + Caddy:** up; Caddy gained the `archive` block (backup
   `/opt/caddy/Caddyfile.bak-20261024`).
-- **Code deployed (live):** her `main` through `2950716` (2026-10-31: byline
-  "By Katmai McKittrick" in both `info.html`, static-only rsync + SOP refresh run
-  with `TZ=America/Anchorage`). `15ae42a` is README-only (not in `deploy/app/`).
-  Her later `a01d159`..`d6da9d7` (2026-10-31) are not deployed and don't need to
-  be: README plus a new `deploy/app/Historical python versions/` archive, nothing
-  under `static/`. The next rsync will copy that folder to the droplet (~6,500 lines
-  plus binaries; outside the nginx root, so not served).
-- **Data (live):** daily cron healthy — last run 2026-11-02 13:00 UTC, success,
-  5/5 blobs. ⚠️ But the live temp pickle is **missing 2026-10-19**, so every
-  temperature since shows one day early (item 0).
-- **Droplet:** 6 containers up, ~1.1 GB RAM available, 37 GB disk free (2026-11-02).
-- **Repo:** `main` in sync with GitHub; no open PRs or branches. Local remote
+- **Code deployed (live):** exactly her `main` at **`695f9e6`** (dry-run rsync with
+  checksums found no differences, 2026-11-05). Katmai deployed it herself; it
+  includes her 11-05 page reworks, the upload route and the new `static/hub/` page
+  (`/static/hub/index_hub.html`, 200; she renamed `Hub/` → `hub/`).
+- **Data (live):** daily cron healthy — last run 2026-11-05 15:42 AKST (manual
+  SOP run, success, 5/5 blobs); `static/` all owned by 999. ⚠️ But the live temp
+  pickle is **missing 2026-10-19**, so every temperature since shows one day early
+  (item 0).
+- **Droplet:** 6 containers up, ~1.1 GB RAM available, 37 GB disk free (2026-11-05).
+- **Repo:** `main` in sync with GitHub at this commit; no open PRs or branches. Local remote
   `archive` = her fork (for re-pins). Note `git fetch origin archive` is wrong
   (treats `archive` as a ref); use `git fetch --multiple origin archive`.
 - **Rollback / backups on the droplet** (prune once things have run clean for a
   while): `/opt/lowtide/{docker-compose.yml,nginx.conf}.bak-20261018`,
   `/opt/lowtide/refresh/work/Temp_data.pre-fix-20261018` and `.pre-refetch-20261018`,
-  `/opt/caddy/Caddyfile.bak-20261024`.
+  `/opt/caddy/Caddyfile.bak-20261024`, and from 2026-11-05
+  `/opt/lowtide/{docker-compose.yml,api/Dockerfile}.bak-20261106` +
+  `/opt/lowtide/refresh/refresh.sh.bak-20261106`.
 
 **Open items** — details in "Possible follow-ups":
+0a. **Tell Katmai (via the user) before her next deploy:** add
+   `--exclude 'static/seldovia_customs.js' --exclude 'static/costal_studies_customs.js'`
+   (and `--exclude 'keys.pickle'`) to her deploy command, or `--delete` wipes her
+   uploads and the key. Better long-term: put upload output in one folder
+   (e.g. `static/uploads/`) so one exclude covers all future uploads. That's her
+   code (path check in `webapp.py`, script tags in pages), so suggest it, don't edit.
+   Also: uploads to the 5 data blobs get overwritten daily; 1 MB body cap.
 0. **Live temp pickle missing 2026-10-19 — fix offered, awaiting the user's OK.**
    Plan (~5 min): add `TZ=America/Anchorage` to refresh.sh's download.py call,
    then full staged refetch of the live pickle (backup first; expect only the
@@ -72,6 +85,11 @@ New since 2026-10-25:
 ones — and `refresh end (success)`), then `git fetch --multiple origin archive` and
 `git log --oneline main..origin/main` (live handoffs) +
 `git log --oneline 60274a7..archive/main` (archive changes; deploy only on request).
+Then `git pull` and compare live with GitHub (read-only; `-n` = dry run, `-c` =
+checksums), from `deploy/`: the full Common-ops rsync with `-az` → `-nrc` and
+`--itemize-changes` added. No output (except a local gitignored `server.log`)
+means live == GitHub. A `*deleting` line for anything is a file that exists only
+on the droplet: find out what it is before any real deploy.
 SSH is `ufw limit`ed (6 connections / 30 s): batch commands into few ssh calls.
 
 ## What this is
@@ -328,7 +346,7 @@ is applied into `deploy/app/` and committed, so her versions diff cleanly.
       --exclude 'static/seldovia_sheet.js' --exclude 'static/costal_studies_sheet.js' \
       --exclude 'static/Temp_data.js' --exclude 'static/temp_data.js' \
       --exclude 'static/seldovia_locations.js' --exclude 'static/costal_studies_locations.js' \
-      --exclude 'keys.pickle' \
+      --exclude 'keys.pickle' --exclude 'static/seldovia_customs.js' --exclude 'static/costal_studies_customs.js' \
       docker-compose.yml nginx.conf api app  root@164.92.75.176:/opt/lowtide/
     # --force-recreate: rsync swaps nginx.conf's inode and a single-file bind mount
     # keeps the old one until recreate. --build: picks up requirements.txt changes.

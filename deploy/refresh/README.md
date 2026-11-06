@@ -34,6 +34,8 @@ code update never overwrites freshly-fetched live data:
     --exclude 'static/seldovia_locations.js'
     --exclude 'static/costal_studies_locations.js'
     --exclude 'keys.pickle'          # upload key, droplet-only (not in git)
+    --exclude 'static/seldovia_customs.js'        # written by /requests/upload,
+    --exclude 'static/costal_studies_customs.js'  # droplet-only (not in git)
 
 (rsync does not delete excluded files on the remote either, so `--delete` is safe.
 That last point is load-bearing for the two `*_locations.js` blobs: they are
