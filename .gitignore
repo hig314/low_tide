@@ -14,5 +14,8 @@ __pycache__/
 *.zip
 extracted/
 
+# Secrets: the upload key lives only on the droplet (/opt/lowtide/app/keys.pickle)
+keys.pickle
+
 # Runtime logs
 server.log

@@ -9,7 +9,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
 COPY app/requirements.txt /tmp/requirements.txt
 RUN pip install -r /tmp/requirements.txt gunicorn \
- && useradd --system --create-home app
+ && useradd --system --uid 999 --create-home app
+# uid pinned: the host chowns app/static to 999 so /requests/upload can write.
 
 USER app
 WORKDIR /app

@@ -1,16 +1,21 @@
 # low_tide — project state
 
-Snapshot for resuming after a break. Last worked: 2026-11-02.
+Snapshot for resuming after a break. Last worked: 2026-11-05 (Alaska).
 
-## ▶ Where we left off (2026-11-02) — read this first
+## ▶ Where we left off (2026-11-05) — read this first
 
 **Everything is deployed, verified and committed. Nothing is mid-flight.**
 One known live-data bug is waiting on the user's go-ahead (open item 0).
 
 New since 2026-10-25:
-- **Katmai has root SSH** (2026-11-02), so she can deploy herself; her first login
-  was **not yet confirmed**. See "Infrastructure". She may deploy without us:
-  on restart, check what's live rather than trusting the "Code deployed" line.
+- **The backend can now write the front end** (2026-11-05, the user's decision):
+  her new `/requests/upload` endpoint overwrites files under `static/`, guarded
+  only by the key in `/opt/lowtide/app/keys.pickle`. See "Key facts". A real upload
+  with the key hasn't been confirmed yet (only the wrong-key path was tested).
+- **Katmai has root SSH** (2026-11-02) and deploys herself: she deployed her
+  11-05 commits (webapp.py upload route, lzw.py, Get_temp_data.py, page reworks)
+  with the SOP refresh. `static/Hub/` was **not live yet** (404) as of 11-05. On
+  restart, check what's live rather than trusting the "Code deployed" line.
 - **Security review done 2026-11-02;** the user decided the arrangement is
   sufficient for now. Remaining notes are in Claude's private memory, deliberately
   not in this public repo. Don't redo the review unless asked.
@@ -132,6 +137,16 @@ already public and need no auth.
 
 ## Change log (deploy-layer sessions, newest first)
 
+- **2026-11-05 — backend may write the front end.** For her `/requests/upload`
+  (the user decided any front-end file may be rewritten). Compose: extra rw mount
+  `./app/static:/app/static` over the ro `/app`; `static/` chowned to uid 999 (the
+  api user, now pinned in `api/Dockerfile`, no rebuild needed); `refresh.sh`
+  re-chowns it after every run, because deploys (`rsync -a`) reset ownership.
+  `keys.pickle` added to the deploy rsync excludes (else `--delete` removes it) and
+  to `.gitignore`. Only `lowtide-api` recreated. Verified: static writable, `/app`
+  + `webapp.py` still read-only, wrong key → "invalid key", refresh OK. Droplet
+  backups: `docker-compose.yml`, `refresh/refresh.sh`, `api/Dockerfile` `.bak-20261106`.
+
 - **2026-11-02 — Katmai root SSH.** Her ed25519 key appended to
   `/root/.ssh/authorized_keys` so she can deploy. No limited account created.
   Security review the same day; the user judged the arrangement sufficient for now.
@@ -222,6 +237,14 @@ assigned, so everything survives a droplet reboot. Safe to walk away.
   redirect is irrelevant (nginx owns `/`). The `Authorization: Basic weird:weather`
   header the NMDS page sends is also an HWITW leftover; nothing checks it. NMDS is
   CPU-bound: ~14 s for 400 rows on the droplet (one worker, so requests queue).
+- **`/requests/upload` (since 2026-11-05)** writes `data[1]` to path `data[2]`
+  (must start `static/`, no `..`) if `data[0]` matches `keys['upload']` from
+  `keys.pickle`. That file is **droplet-only**: never in git, excluded from the
+  deploy rsync, owned by 999, mode 400. If it's lost, she must re-copy it with
+  `scp`. Gotchas: uploaded files not also committed to git are **deleted or
+  overwritten by the next deploy**; uploads to the 5 data blobs are overwritten
+  by the daily refresh; nginx caps `/requests/` bodies at 1 MB (shared 10/min/IP
+  rate limit with NMDS).
 - **Linux case-sensitivity fix (deploy-layer, not a source edit):** `index_lt.html`
   loads `temp_data.js` but the actual file is `Temp_data.js`. Invisible on the
   dev's case-insensitive Mac; a 404 on Linux (breaks "Show temperature"). Fixed by
@@ -305,6 +328,7 @@ is applied into `deploy/app/` and committed, so her versions diff cleanly.
       --exclude 'static/seldovia_sheet.js' --exclude 'static/costal_studies_sheet.js' \
       --exclude 'static/Temp_data.js' --exclude 'static/temp_data.js' \
       --exclude 'static/seldovia_locations.js' --exclude 'static/costal_studies_locations.js' \
+      --exclude 'keys.pickle' \
       docker-compose.yml nginx.conf api app  root@164.92.75.176:/opt/lowtide/
     # --force-recreate: rsync swaps nginx.conf's inode and a single-file bind mount
     # keeps the old one until recreate. --build: picks up requirements.txt changes.

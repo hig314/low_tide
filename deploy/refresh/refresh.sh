@@ -90,6 +90,10 @@ for f in "${BLOBS[@]}"; do
 done
 cp -f "$LIVE/static/Temp_data.js" "$LIVE/static/temp_data.js"
 chmod -R a+rX "$LIVE/static"
+# Let lowtide-api (uid 999) write the front end for /requests/upload. Deploys
+# (rsync -a) reset ownership to the deployer's Mac uid; this restores it, and
+# the SOP refresh runs after every deploy.
+chown -R 999:999 "$LIVE/static"
 
 log "OK: published $published/${#BLOBS[@]} blobs"
 log "=== refresh end (success) ==="

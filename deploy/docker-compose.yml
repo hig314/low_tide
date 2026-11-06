@@ -26,6 +26,11 @@ services:
     restart: unless-stopped
     volumes:
       - ./app:/app:ro
+      # static/ is writable on top of the read-only /app (2026-11-06, the user's
+      # decision): her /requests/upload endpoint rewrites front-end files. Files
+      # must be owned by uid 999 (the api user); refresh.sh re-applies the chown
+      # after every deploy and daily. The backend's own code stays read-only.
+      - ./app/static:/app/static
     expose:
       - "5000"
     networks:
